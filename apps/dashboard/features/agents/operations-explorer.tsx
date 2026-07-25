@@ -214,6 +214,9 @@ function OperationRow({
         toast.success(
           Number(r.paid) > 0 ? `Ran ${op.name} · paid $${r.paid} USDC` : `Ran ${op.name}`,
         );
+        if (r.borrowed) {
+          toast.info(`Borrowed $${r.borrowed} from TrustLine to cover the shortfall`);
+        }
       } else {
         toast.error(r.error ?? "The call failed.");
       }
@@ -377,10 +380,18 @@ function ResultPanel({ result, sample }: { result: RunResult | null; sample: str
       )}
     >
       {live ? (
-        <div className="flex items-center gap-1.5 border-b bg-emerald-500/5 px-3 py-1.5 text-xs font-medium text-emerald-600">
-          <Sparkles className="h-3.5 w-3.5" />
-          {Number(result?.paid) > 0 ? `Paid $${result?.paid} USDC` : "Ran free"} · {result?.status}{" "}
-          OK
+        <div className="space-y-1 border-b bg-emerald-500/5 px-3 py-1.5">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600">
+            <Sparkles className="h-3.5 w-3.5" />
+            {Number(result?.paid) > 0 ? `Paid $${result?.paid} USDC` : "Ran free"} ·{" "}
+            {result?.status} OK
+          </div>
+          {result?.borrowed ? (
+            <div className="flex items-center gap-1.5 text-xs font-medium text-violet-600 dark:text-violet-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-violet-500" /> Borrowed $
+              {result.borrowed} from TrustLine to cover the shortfall
+            </div>
+          ) : null}
         </div>
       ) : null}
       <pre className="max-h-72 min-w-0 overflow-auto p-3 font-mono text-[11px] leading-relaxed">

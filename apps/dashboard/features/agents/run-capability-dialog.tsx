@@ -284,6 +284,13 @@ function ResultView({
         Paid ${result.paid} USDC · {result.status} OK
       </div>
 
+      {result.borrowed ? (
+        <div className="flex items-center gap-1.5 text-sm font-medium text-violet-600 dark:text-violet-400">
+          <span className="h-1.5 w-1.5 rounded-full bg-violet-500" /> Borrowed ${result.borrowed}{" "}
+          from TrustLine to cover the shortfall
+        </div>
+      ) : null}
+
       <div className="min-w-0 overflow-hidden rounded-lg border bg-muted/40">
         <pre className="max-h-64 min-w-0 overflow-auto p-3 text-xs leading-relaxed">
           <code>{pretty}</code>
