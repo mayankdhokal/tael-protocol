@@ -22,6 +22,10 @@ import {
 import { navGroups } from "../../features/navigation/nav.config";
 import { TaelLogo } from "../logo";
 
+/** Which Stellar network this dashboard runs against (build-time env). */
+const IS_MAINNET = process.env.NEXT_PUBLIC_STELLAR_NETWORK === "mainnet";
+const NETWORK_LABEL = IS_MAINNET ? "Mainnet" : "Testnet";
+
 function isActive(pathname: string, href: string): boolean {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
 }
@@ -36,6 +40,21 @@ function BetaBadge({ className }: { className?: string }) {
       )}
     >
       Beta
+    </span>
+  );
+}
+
+/** Mainnet pill next to the wordmark. Only shown on mainnet, where it signals
+ *  that calls move real USDC. */
+function MainnetBadge({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-400",
+        className,
+      )}
+    >
+      Mainnet
     </span>
   );
 }
@@ -85,6 +104,7 @@ export function AppSidebar({ address }: { address: string | null }) {
             t
           </span>
           <BetaBadge className="group-data-[collapsible=icon]:hidden" />
+          {IS_MAINNET ? <MainnetBadge className="group-data-[collapsible=icon]:hidden" /> : null}
         </Link>
       </SidebarHeader>
 
@@ -130,7 +150,7 @@ export function AppSidebar({ address }: { address: string | null }) {
                   <span className="truncate font-mono text-sm font-medium">
                     {address ? truncateAddress(address) : "Not connected"}
                   </span>
-                  <span className="truncate text-xs text-sidebar-foreground/70">Testnet</span>
+                  <span className="truncate text-xs text-sidebar-foreground/70">{NETWORK_LABEL}</span>
                 </span>
               </Link>
             </SidebarMenuButton>

@@ -13,7 +13,8 @@ export const meta: CapabilityMeta = {
   faqs: [
     {
       question: "Which network does this read from?",
-      answer: "The Stellar network Tael is running on (testnet today).",
+      answer:
+        "The Stellar network this listing targets. Tael is live on mainnet, with a testnet build for development.",
     },
     {
       question: "Which operations cost money?",
