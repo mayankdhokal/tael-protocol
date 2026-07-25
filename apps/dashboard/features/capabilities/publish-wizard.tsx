@@ -34,7 +34,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 // this issuer, or Stellar rejects the payment (op_no_trust). Shown to publishers
 // so they set it up before listing.
 const USDC_ISSUER =
-  process.env.NEXT_PUBLIC_USDC_ISSUER ?? "GBCDXWBEN7YMCBI3DPIWQ5QBGG2NE7G5REZLNJI2E57VVNVDQM7PF7RA";
+  process.env.NEXT_PUBLIC_USDC_ISSUER ?? "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
 
 type Step = "describe" | "test" | "verify" | "done";
 type Answer = { question: string; answer: string };

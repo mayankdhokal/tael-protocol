@@ -31,7 +31,7 @@ const TRUSTLINE_API = process.env.TRUSTLINE_API;
 const HORIZON_URL = process.env.STELLAR_HORIZON_URL ?? "https://horizon-testnet.stellar.org";
 // Action settlement config (the Pay action and future on-chain actions).
 const USDC_ISSUER =
-  process.env.USDC_ISSUER ?? "GBCDXWBEN7YMCBI3DPIWQ5QBGG2NE7G5REZLNJI2E57VVNVDQM7PF7RA";
+  process.env.USDC_ISSUER ?? "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
 const FEE_ADDRESS = process.env.TAEL_FEE_ADDRESS ?? "";
 // Tael's cut of an action, in basis points of the amount sent (100 = 1%).
 const ACTION_FEE_BPS = Number(process.env.TAEL_ACTION_FEE_BPS ?? "100");

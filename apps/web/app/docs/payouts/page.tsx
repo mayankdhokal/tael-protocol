@@ -39,8 +39,8 @@ export default function PayoutsPage() {
         code={`# Mainnet  (Circle USDC)
 USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN
 
-# Testnet  (Tael test USDC)
-USDC:GBCDXWBEN7YMCBI3DPIWQ5QBGG2NE7G5REZLNJI2E57VVNVDQM7PF7RA`}
+# Testnet  (SDF testnet USDC)
+USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5`}
       />
       <P>
         Most wallets make this one click. In Freighter, open <Code>Manage assets</Code>, choose{" "}

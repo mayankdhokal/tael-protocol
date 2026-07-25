@@ -38,7 +38,7 @@ import {
 const CAP_URL = process.env.CAP_URL ?? "http://localhost:3004";
 const HORIZON_URL = process.env.STELLAR_HORIZON_URL ?? "https://horizon-testnet.stellar.org";
 const USDC_ISSUER =
-  process.env.USDC_ISSUER ?? "GBCDXWBEN7YMCBI3DPIWQ5QBGG2NE7G5REZLNJI2E57VVNVDQM7PF7RA";
+  process.env.USDC_ISSUER ?? "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
 const FRIENDBOT = "https://friendbot.stellar.org";
 const server = new Horizon.Server(HORIZON_URL);
 

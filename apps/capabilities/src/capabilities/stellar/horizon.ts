@@ -404,7 +404,7 @@ export async function explainTransaction(hash: string): Promise<TxExplanation> {
 
 /** The USDC asset portfolio values are quoted in. Overridable per deployment. */
 const USDC_ASSET =
-  process.env.USDC_ASSET ?? "USDC:GBCDXWBEN7YMCBI3DPIWQ5QBGG2NE7G5REZLNJI2E57VVNVDQM7PF7RA";
+  process.env.USDC_ASSET ?? "USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
 
 export interface Holding {
   asset: string;
