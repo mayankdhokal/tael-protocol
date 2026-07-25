@@ -38,7 +38,7 @@ export default function DocsLayout({ children }: { children: ReactNode }) {
                 tael
               </span>
             </a>
-            <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-400">
+            <span className="inline-flex items-center rounded-full bg-gradient-to-r from-[#156DFC] to-indigo-500 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow-sm">
               Mainnet
             </span>
           </div>
