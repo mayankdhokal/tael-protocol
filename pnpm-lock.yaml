@@ -342,8 +342,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@trustline-agents/agent-sdk':
-        specifier: ^0.2.0
-        version: 0.2.0
+        specifier: ^0.2.1
+        version: 0.2.1
       lucide-react:
         specifier: 'catalog:'
         version: 0.469.0(react@19.2.7)
@@ -4712,8 +4712,8 @@ packages:
     peerDependencies:
       typescript: '>=5.7.2'
 
-  '@trustline-agents/agent-sdk@0.2.0':
-    resolution: {integrity: sha512-Rtvq6NZM1s88VS4cXkV1tAXHzSP7n4ycDBHzjTin2a2D5E9e0WSPtDBx9urACSX3H4/HIc38mGX/6lmrlmfrXg==}
+  '@trustline-agents/agent-sdk@0.2.1':
+    resolution: {integrity: sha512-rJeYrwC/FKQL5+z8VjaF8BRuuCk/XWT1/2A43Ju3B2YzDlP03LIeMfH8JbqE6XwRijMm6Kd4RXXuiYybFXWPew==}
 
   '@turbo/darwin-64@2.10.2':
     resolution: {integrity: sha512-wBM3ObqOWnKUDmg7QfUFDkDHPFUAJmrYlYqmEM8jMPAPA/I6wRJIbWimeQUqhOiQ8xPKhzyWM+xaiUP0wz8FEQ==}
@@ -13293,7 +13293,7 @@ snapshots:
     dependencies:
       typescript: 5.9.3
 
-  '@trustline-agents/agent-sdk@0.2.0':
+  '@trustline-agents/agent-sdk@0.2.1':
     dependencies:
       '@stellar/stellar-sdk': 16.0.1
       '@x402/fetch': 2.18.0

@@ -23,7 +23,7 @@
     "@tael/stellar": "workspace:*",
     "@tael/types": "workspace:*",
     "@tael/ui": "workspace:*",
-    "@trustline-agents/agent-sdk": "^0.2.0",
+    "@trustline-agents/agent-sdk": "^0.2.1",
     "lucide-react": "catalog:",
     "next": "catalog:",
     "next-themes": "catalog:",
