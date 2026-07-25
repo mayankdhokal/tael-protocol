@@ -17,13 +17,13 @@ export default function PayoutsPage() {
     >
       <H2 id="how">How you get paid</H2>
       <P>
-        When an agent pays for your capability, Tael settles the USDC to your payout wallet in the same
-        request. The builder share and the Tael fee move on-chain atomically: either both land or
-        neither does. There are no invoices, no monthly payouts, and no waiting.
+        When an agent pays for your capability, Tael settles the USDC to your payout wallet in the
+        same request. The builder share and the Tael fee move on-chain atomically: either both land
+        or neither does. There are no invoices, no monthly payouts, and no waiting.
       </P>
       <P>
-        Your payout wallet is just a Stellar address you control. You set it as <Code>payTo</Code> when
-        you publish, and you can reuse one wallet across every capability you sell.
+        Your payout wallet is just a Stellar address you control. You set it as <Code>payTo</Code>{" "}
+        when you publish, and you can reuse one wallet across every capability you sell.
       </P>
 
       <H2 id="trustline">Add a USDC trustline</H2>
@@ -32,9 +32,7 @@ export default function PayoutsPage() {
         Stellar rule, not a Tael setting: an account cannot hold an asset without first trusting its
         issuer. Without the trustline, a payout cannot settle and the paid call fails.
       </Callout>
-      <P>
-        Add a trustline to the USDC issuer for the network you are getting paid on:
-      </P>
+      <P>Add a trustline to the USDC issuer for the network you are getting paid on:</P>
       <CodeBlock
         title="USDC issuers"
         lang="bash"
@@ -61,8 +59,8 @@ USDC:GBCDXWBEN7YMCBI3DPIWQ5QBGG2NE7G5REZLNJI2E57VVNVDQM7PF7RA`}
       <H2 id="xlm">Fund the wallet with XLM</H2>
       <P>
         A Stellar account needs a small XLM balance to exist and to hold a trustline: about{" "}
-        <Code>1 XLM</Code> base reserve plus <Code>0.5 XLM</Code> per trustline. This XLM is a reserve,
-        not a fee, it stays in your account.
+        <Code>1 XLM</Code> base reserve plus <Code>0.5 XLM</Code> per trustline. This XLM is a
+        reserve, not a fee, it stays in your account.
       </P>
       <Ul>
         <li>
@@ -76,13 +74,14 @@ USDC:GBCDXWBEN7YMCBI3DPIWQ5QBGG2NE7G5REZLNJI2E57VVNVDQM7PF7RA`}
 
       <H2 id="payto">Use it as your payout wallet</H2>
       <P>
-        When you publish a capability, set this wallet as <Code>payTo</Code>. Every settled call then
-        pays you there instantly. See <A href="/docs/become-a-capability">Become a capability</A> for
-        the full publish flow.
+        When you publish a capability, set this wallet as <Code>payTo</Code>. Every settled call
+        then pays you there instantly. See{" "}
+        <A href="/docs/become-a-capability">Become a capability</A> for the full publish flow.
       </P>
       <Callout>
-        On mainnet, <Code>payTo</Code> must be the mainnet wallet that holds the Circle USDC trustline.
-        A wallet without the trustline will reject payouts, so set this up before you go live.
+        On mainnet, <Code>payTo</Code> must be the mainnet wallet that holds the Circle USDC
+        trustline. A wallet without the trustline will reject payouts, so set this up before you go
+        live.
       </Callout>
     </DocPage>
   );

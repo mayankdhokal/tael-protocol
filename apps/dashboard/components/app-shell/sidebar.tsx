@@ -150,7 +150,9 @@ export function AppSidebar({ address }: { address: string | null }) {
                   <span className="truncate font-mono text-sm font-medium">
                     {address ? truncateAddress(address) : "Not connected"}
                   </span>
-                  <span className="truncate text-xs text-sidebar-foreground/70">{NETWORK_LABEL}</span>
+                  <span className="truncate text-xs text-sidebar-foreground/70">
+                    {NETWORK_LABEL}
+                  </span>
                 </span>
               </Link>
             </SidebarMenuButton>
