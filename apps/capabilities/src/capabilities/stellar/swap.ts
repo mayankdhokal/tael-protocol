@@ -8,7 +8,7 @@
 const HORIZON_URL = process.env.STELLAR_HORIZON_URL ?? "https://horizon-testnet.stellar.org";
 const NETWORK = process.env.STELLAR_NETWORK === "mainnet" ? "stellar" : "stellar-testnet";
 const USDC_ISSUER =
-  process.env.USDC_ISSUER ?? "GBCDXWBEN7YMCBI3DPIWQ5QBGG2NE7G5REZLNJI2E57VVNVDQM7PF7RA";
+  process.env.USDC_ISSUER ?? "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
 
 /** The two assets v1 swaps between. Kept small on purpose — both have deep testnet liquidity. */
 export type SwapSymbol = "XLM" | "USDC";
