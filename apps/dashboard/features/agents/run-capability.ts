@@ -59,6 +59,8 @@ export interface RunResult {
   body?: string;
   /** Total USDC the agent paid for this call. */
   paid?: string;
+  /** USDC drawn from TrustLine credit to cover a shortfall on this call, if any. */
+  borrowed?: string;
   error?: string;
 }
 
@@ -260,6 +262,7 @@ export async function runCapability(input: {
   // Wallets that opt out, have no credit line, or hit any failure just see the
   // same shortfall and the same error as today — this never blocks a call that
   // would otherwise have failed anyway.
+  let borrowed: string | undefined;
   let { usdc } = await fetchUsdcBalance(agent.address);
   if (
     agent.policy?.allowCreditDraw &&
@@ -268,6 +271,7 @@ export async function runCapability(input: {
     const shortfall = total.subtract(Money.parse(usdc));
     const drew = await tryDrawTrustLineCredit(secretEnc, shortfall.toDecimalString());
     if (drew) {
+      borrowed = shortfall.toDecimalString();
       usdc = (await fetchUsdcBalance(agent.address)).usdc;
     }
   }
@@ -327,7 +331,7 @@ export async function runCapability(input: {
       const buffer = agent.policy?.maxPerCall ?? total.toDecimalString();
       await maybeRepayTrustLineCredit(secretEnc, buffer);
     }
-    return { ok: true, status: res.status, body, paid: total.toDecimalString() };
+    return { ok: true, status: res.status, body, paid: total.toDecimalString(), borrowed };
   } catch {
     return { ok: false, error: "Couldn't reach the capability. Try again." };
   }

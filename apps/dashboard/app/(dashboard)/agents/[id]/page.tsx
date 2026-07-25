@@ -35,15 +35,23 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
             <p className="text-sm text-muted-foreground">Card</p>
             <h1 className="text-2xl font-semibold tracking-tight">{agent.name}</h1>
           </div>
-          {agent.ready ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Ready to spend
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Needs provisioning
-            </span>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {agent.ready ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Ready to spend
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Needs provisioning
+              </span>
+            )}
+            {agent.owedTrustLine ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-500/10 px-2.5 py-1 text-xs font-medium text-violet-700 dark:text-violet-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-violet-500" /> Owes TrustLine $
+                {agent.owedTrustLine}
+              </span>
+            ) : null}
+          </div>
           <p className="text-sm text-muted-foreground">
             Fund this card and set its limits below. Your agents pay from it per call, and nothing
             exceeds the caps you set.

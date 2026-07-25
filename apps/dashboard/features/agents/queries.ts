@@ -4,6 +4,7 @@ import type { SpendingPolicy } from "@tael/types";
 import { db } from "../../lib/db";
 import { getCurrentUser } from "../capabilities/current-user";
 import { fetchUsdcBalance } from "./balance";
+import { fetchTrustLineOwed } from "./trustline";
 
 export interface AgentWallet {
   agentId: string;
@@ -15,6 +16,9 @@ export interface AgentWallet {
   funded: boolean;
   /** Has a USDC trustline, so it can receive USDC. */
   ready: boolean;
+  /** Outstanding TrustLine debt as a decimal USDC string, or null when it owes
+   *  nothing / credit isn't configured. Only populated on the card detail page. */
+  owedTrustLine?: string | null;
   createdAt: Date;
 }
 
@@ -123,6 +127,8 @@ export async function getAgentDetail(agentId: string): Promise<AgentWallet | nul
       name: agents.name,
       policy: agents.policy,
       address: wallets.address,
+      // Server-only: used to read this card's TrustLine debt, never returned.
+      secretEnc: wallets.secretEnc,
       createdAt: agents.createdAt,
     })
     .from(agents)
@@ -132,6 +138,7 @@ export async function getAgentDetail(agentId: string): Promise<AgentWallet | nul
 
   if (!r) return null;
   const { usdc, funded, ready } = await fetchUsdcBalance(r.address);
+  const owedTrustLine = r.secretEnc ? await fetchTrustLineOwed(r.secretEnc) : null;
   return {
     agentId: r.agentId,
     name: r.name,
@@ -140,6 +147,7 @@ export async function getAgentDetail(agentId: string): Promise<AgentWallet | nul
     usdc,
     funded,
     ready,
+    owedTrustLine,
     createdAt: r.createdAt,
   };
 }
