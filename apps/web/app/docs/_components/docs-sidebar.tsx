@@ -21,7 +21,10 @@ export const SECTIONS = [
   },
   {
     title: "Partners",
-    items: [{ label: "Become a capability", href: "/docs/become-a-capability" }],
+    items: [
+      { label: "Become a capability", href: "/docs/become-a-capability" },
+      { label: "Get paid", href: "/docs/payouts" },
+    ],
   },
   {
     title: "SDKs",

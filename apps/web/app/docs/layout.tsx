@@ -31,12 +31,17 @@ export default function DocsLayout({ children }: { children: ReactNode }) {
       {/* Top nav */}
       <header className="sticky top-0 z-40 border-b border-line bg-white/90 backdrop-blur dark:border-white/10 dark:bg-[#0a0a0a]/90">
         <div className="flex h-14 items-center gap-8 px-6">
-          <a href="/" className="flex items-center gap-1">
-            <span className="font-display text-[20px] leading-none text-accent">t</span>
-            <span className="text-[20px] font-medium tracking-[0.01em] text-black dark:text-white">
-              tael
+          <div className="flex items-center gap-2">
+            <a href="/" className="flex items-center gap-1">
+              <span className="font-display text-[20px] leading-none text-accent">t</span>
+              <span className="text-[20px] font-medium tracking-[0.01em] text-black dark:text-white">
+                tael
+              </span>
+            </a>
+            <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-400">
+              Mainnet
             </span>
-          </a>
+          </div>
 
           <nav className="hidden items-center gap-6 md:flex">
             {TABS.map((tab) => (
