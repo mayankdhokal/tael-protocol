@@ -30,8 +30,9 @@ function isActive(pathname: string, href: string): boolean {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
 }
 
-/** Small BETA pill next to the wordmark. */
-function BetaBadge({ className }: { className?: string }) {
+/** The pill next to the wordmark: the network name on mainnet (where calls move
+ *  real USDC), otherwise "Beta". One badge, so the header stays clean. */
+function StatusBadge({ className }: { className?: string }) {
   return (
     <span
       className={cn(
@@ -39,22 +40,7 @@ function BetaBadge({ className }: { className?: string }) {
         className,
       )}
     >
-      Beta
-    </span>
-  );
-}
-
-/** Mainnet pill next to the wordmark. Only shown on mainnet, where it signals
- *  that calls move real USDC. */
-function MainnetBadge({ className }: { className?: string }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-400",
-        className,
-      )}
-    >
-      Mainnet
+      {IS_MAINNET ? "Mainnet" : "Beta"}
     </span>
   );
 }
@@ -103,8 +89,7 @@ export function AppSidebar({ address }: { address: string | null }) {
           >
             t
           </span>
-          <BetaBadge className="group-data-[collapsible=icon]:hidden" />
-          {IS_MAINNET ? <MainnetBadge className="group-data-[collapsible=icon]:hidden" /> : null}
+          <StatusBadge className="group-data-[collapsible=icon]:hidden" />
         </Link>
       </SidebarHeader>
 
