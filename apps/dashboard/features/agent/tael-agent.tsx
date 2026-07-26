@@ -2,14 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  AGENT_NAME,
-  AGENT_TAGLINE,
-  GREETING,
-  INTRO_BODY,
-  INTRO_MESSAGE,
-  SUGGESTED_QUESTIONS,
-} from "./knowledge";
+import { Trash2 } from "lucide-react";
+import { AGENT_NAME, AGENT_TAGLINE, INTRO_MESSAGE, SUGGESTED_QUESTIONS } from "./knowledge";
 import { useAgentChat } from "./use-agent-chat";
 import { MessageBubble } from "./message-bubble";
 import { ChatSmileIcon, ChevronDownIcon, CloseIcon, SendIcon, TaelLogoMark } from "./icons";
@@ -22,9 +16,8 @@ const CHIP_CLASS =
 
 /**
  * The Tael Agent: a floating, self-contained support widget. Drop `<TaelAgent />`
- * anywhere (it renders its own fixed launcher, proactive teaser, and panel) and
- * it answers questions about Tael, streamed from /api/agent. No app-specific UI
- * deps, so it's reusable across surfaces — pass props to retheme or repoint it.
+ * anywhere (it renders its own fixed launcher and panel) and it answers questions
+ * about Tael from /api/agent. It only opens on click — no proactive pop-up.
  */
 export function TaelAgent({
   endpoint = "/api/agent",
@@ -34,70 +27,25 @@ export function TaelAgent({
   suggestions = SUGGESTED_QUESTIONS,
 }: TaelAgentProps) {
   const [open, setOpen] = useState(false);
-  const [teaser, setTeaser] = useState(false);
   const [draft, setDraft] = useState("");
   const [unread, setUnread] = useState(0);
-  const { messages, streaming, send } = useAgentChat(endpoint);
+  const { messages, streaming, send, runAction, clear } = useAgentChat(endpoint);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const wasStreaming = useRef(false);
   const askedPermission = useRef(false);
-  // Once the teaser has been shown or dismissed, never auto-pop it again.
-  const teaserDone = useRef(false);
-  // The teaser's tick can be autoplay-blocked on a fresh load; flush it on the
-  // visitor's first gesture instead.
-  const teaserSoundPending = useRef(false);
-
-  // Proactive greeting: two seconds after load, nudge with the teaser card
-  // (unless the visitor already opened the panel).
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (teaserDone.current || open) return;
-      teaserDone.current = true;
-      setTeaser(true);
-      setUnread(1);
-      void playChime().then((ok) => {
-        if (!ok) teaserSoundPending.current = true;
-      });
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, [open]);
-
-  // Browsers block audio before the first interaction, so the teaser tick above
-  // may be silenced on a fresh load. Play it on the visitor's first gesture.
-  useEffect(() => {
-    const flush = () => {
-      if (teaserSoundPending.current) {
-        teaserSoundPending.current = false;
-        void playChime();
-      }
-      window.removeEventListener("pointerdown", flush);
-      window.removeEventListener("keydown", flush);
-      window.removeEventListener("scroll", flush);
-    };
-    window.addEventListener("pointerdown", flush);
-    window.addEventListener("keydown", flush);
-    window.addEventListener("scroll", flush, { passive: true });
-    return () => {
-      window.removeEventListener("pointerdown", flush);
-      window.removeEventListener("keydown", flush);
-      window.removeEventListener("scroll", flush);
-    };
-  }, []);
 
   // Keep the transcript pinned to the latest message as it streams in.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, open]);
 
-  // On open: focus the input, clear the teaser + unread dot, and ask once for
-  // permission to send browser notifications (to nudge when the panel is closed).
+  // On open: focus the input, clear the unread dot, and ask once for permission
+  // to send browser notifications (to nudge when the panel is closed).
   useEffect(() => {
     if (!open) return;
     inputRef.current?.focus();
     setUnread(0);
-    setTeaser(false);
-    teaserDone.current = true;
     if (!askedPermission.current) {
       askedPermission.current = true;
       void ensureNotifyPermission();
@@ -128,65 +76,8 @@ export function TaelAgent({
     setDraft("");
   }
 
-  /** From the teaser: open the panel and send the tapped suggestion. */
-  function ask(question: string) {
-    setTeaser(false);
-    setOpen(true);
-    submit(question);
-  }
-
   return (
     <>
-      {/* Proactive teaser: greeting card + suggestions, above the launcher. */}
-      <AnimatePresence>
-        {teaser && !open && (
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 16 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-            className="fixed bottom-24 right-5 z-[60] flex w-[calc(100vw-2.5rem)] flex-col items-end gap-2 sm:w-[404px]"
-          >
-            <div className="group relative w-full rounded-[20px] border border-white/10 bg-[#14161a] p-4 text-white shadow-[0_24px_70px_-20px_rgba(0,0,0,0.7)]">
-              <button
-                type="button"
-                onClick={() => {
-                  setTeaser(false);
-                  setUnread(0);
-                }}
-                aria-label="Dismiss"
-                className="absolute -right-2.5 -top-2.5 flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-[#1c1c1f] text-white/70 opacity-0 shadow transition-opacity duration-150 hover:text-white group-hover:opacity-100"
-              >
-                <CloseIcon className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setOpen(true)}
-                className="flex w-full items-start gap-3 text-left"
-              >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white">
-                  <TaelLogoMark className="text-[20px]" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-[15px] font-semibold">{GREETING}</span>
-                  <span className="mt-1 block text-[14px] leading-relaxed text-white/90">
-                    {INTRO_BODY}
-                  </span>
-                  <span className="mt-1.5 block text-xs text-white/40">{name} • Just now</span>
-                </span>
-              </button>
-            </div>
-            <div className="flex flex-wrap justify-end gap-2">
-              {suggestions.map((q) => (
-                <button key={q} type="button" onClick={() => ask(q)} className={CHIP_CLASS}>
-                  {q}
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Launcher */}
       <motion.button
         type="button"
@@ -233,6 +124,17 @@ export function TaelAgent({
                 <p className="text-sm font-semibold leading-tight">{name}</p>
                 <p className="truncate text-xs text-white/50">{tagline}</p>
               </div>
+              {messages.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={clear}
+                  aria-label="Clear chat"
+                  title="Clear chat"
+                  className="rounded-md p-1 text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+                >
+                  <Trash2 className="h-[18px] w-[18px]" />
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => setOpen(false)}
@@ -262,6 +164,7 @@ export function TaelAgent({
                 <MessageBubble
                   key={m.id}
                   message={m}
+                  onRunAction={runAction}
                   showMeta={
                     i === messages.length - 1 && m.role === "assistant" && m.content.length > 0
                   }

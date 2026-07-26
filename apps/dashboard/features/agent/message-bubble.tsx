@@ -1,8 +1,82 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { motion } from "framer-motion";
-import type { AgentMessage } from "./types";
+import type { AgentMessage, ProposedAction } from "./types";
 import { DiscordIcon } from "./icons";
+
+/** Inline markdown: **bold** and `code`. */
+function renderInline(s: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  const re = /(\*\*[^*]+\*\*|`[^`]+`)/g;
+  let last = 0;
+  let k = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(s)) !== null) {
+    if (m.index > last) out.push(s.slice(last, m.index));
+    const tok = m[0];
+    if (tok.startsWith("**")) {
+      out.push(<strong key={k++}>{tok.slice(2, -2)}</strong>);
+    } else {
+      out.push(
+        <code key={k++} className="rounded bg-white/10 px-1 py-0.5 font-mono text-[12px]">
+          {tok.slice(1, -1)}
+        </code>,
+      );
+    }
+    last = m.index + tok.length;
+  }
+  if (last < s.length) out.push(s.slice(last));
+  return out;
+}
+
+/**
+ * A small, tasteful markdown renderer for the assistant's replies: paragraphs,
+ * bullet + numbered lists, bold, and inline code. Enough for chat, no deps.
+ */
+function Markdown({ text }: { text: string }) {
+  const blocks: ReactNode[] = [];
+  let list: { ordered: boolean; items: string[] } | null = null;
+
+  const flush = (key: string) => {
+    if (!list) return;
+    const items = list.items.map((it, i) => <li key={i}>{renderInline(it)}</li>);
+    blocks.push(
+      list.ordered ? (
+        <ol key={`o${key}`} className="list-decimal space-y-1 pl-5">
+          {items}
+        </ol>
+      ) : (
+        <ul key={`u${key}`} className="list-disc space-y-1 pl-5 marker:text-white/40">
+          {items}
+        </ul>
+      ),
+    );
+    list = null;
+  };
+
+  text.split("\n").forEach((line, i) => {
+    const bullet = line.match(/^\s*[*-]\s+(.*)/);
+    const number = line.match(/^\s*\d+\.\s+(.*)/);
+    if (bullet) {
+      if (!list || list.ordered) flush(`${i}`);
+      list ??= { ordered: false, items: [] };
+      list.items.push(bullet[1]!);
+      return;
+    }
+    if (number) {
+      if (!list || !list.ordered) flush(`${i}`);
+      list ??= { ordered: true, items: [] };
+      list.items.push(number[1]!);
+      return;
+    }
+    flush(`${i}`);
+    if (line.trim()) blocks.push(<p key={i}>{renderInline(line)}</p>);
+  });
+  flush("end");
+
+  return <div className="space-y-2 leading-relaxed">{blocks}</div>;
+}
 
 /** A blinking three-dot indicator shown while the first token is in flight. */
 export function TypingDots() {
@@ -44,9 +118,12 @@ const DISCORD_RE = /(?:https?:\/\/)?discord\.(?:gg|com\/invite)\/[A-Za-z0-9-]+/i
 export function MessageBubble({
   message,
   showMeta,
+  onRunAction,
 }: {
   message: AgentMessage;
   showMeta?: boolean;
+  /** Called when the user confirms a proposed capability run. */
+  onRunAction?: (messageId: string, action: ProposedAction) => void;
 }) {
   const isUser = message.role === "user";
   const empty = message.content.length === 0;
@@ -78,15 +155,16 @@ export function MessageBubble({
         >
           {empty ? (
             <TypingDots />
+          ) : isUser ? (
+            <p className="whitespace-pre-wrap">{text}</p>
           ) : (
-            <motion.p
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.25, ease: "easeOut" }}
-              className="whitespace-pre-wrap"
             >
-              {text}
-            </motion.p>
+              <Markdown text={text} />
+            </motion.div>
           )}
         </div>
       ) : null}
@@ -100,6 +178,28 @@ export function MessageBubble({
         >
           <DiscordIcon className="h-4 w-4" /> Join our Discord
         </a>
+      ) : null}
+
+      {message.action && !message.actionDone ? (
+        <div className="w-full max-w-[85%] rounded-2xl border border-white/10 bg-[#1c1d21] p-3">
+          <p className="text-[11px] uppercase tracking-wide text-white/40">Run capability</p>
+          <p className="mt-0.5 text-[13.5px] font-medium text-zinc-100">
+            {message.action.operationName}{" "}
+            <span className="text-white/50">· {message.action.capabilityName}</span>
+          </p>
+          <p className="mt-0.5 text-[12px] text-white/50">
+            Pays from your <span className="text-white/70">{message.action.cardName}</span> card
+          </p>
+          <button
+            type="button"
+            onClick={() => onRunAction?.(message.id, message.action!)}
+            className="mt-2.5 w-full rounded-lg bg-white px-3 py-1.5 text-[13px] font-medium text-[#14161a] transition-all duration-150 ease-out hover:bg-white/90 active:scale-[0.98]"
+          >
+            {Number(message.action.price) > 0
+              ? `Run · $${message.action.price} USDC`
+              : "Run · free"}
+          </button>
+        </div>
       ) : null}
 
       {!isUser && showMeta && !empty ? (

@@ -1,4 +1,5 @@
 import { DASHBOARD_SYSTEM_PROMPT } from "../../../features/agent/knowledge";
+import type { ProposedAction } from "../../../features/agent/types";
 import { listAgentWallets } from "../../../features/agents/queries";
 import {
   getPublicCapabilityBySlug,
@@ -8,11 +9,12 @@ import {
 import { getPaymentsData } from "../../../features/payments/queries";
 import { getWalletOverview } from "../../../features/wallet/queries";
 
-// The dashboard's Tael copilot. Unlike the marketing widget, it runs a tool
-// loop: it can call the same server queries the pages use (scoped to the signed
-// in user's session), so it answers with the account's real, live data. Talks to
-// OpenRouter (OpenAI-compatible) so the model is swappable — default Gemini 2.5
-// Flash. Node runtime: reads a server-only key and touches server-only queries.
+// The dashboard's Tael copilot. It runs a tool loop over the same server queries
+// the pages use (scoped to the signed-in user's session), so it answers with the
+// account's real, live data. It can also PROPOSE running a capability — that
+// never runs on its own; it returns a confirmation the user approves before a
+// card pays. Talks to OpenRouter (default Gemini 2.5 Flash, swappable). Node
+// runtime: reads a server-only key and touches server-only queries.
 export const runtime = "nodejs";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -36,18 +38,24 @@ interface OpenRouterResponse {
   choices?: { message?: ChatMessage }[];
 }
 
-/** Read-only tools the copilot can call. Each returns live data for the signed
- *  in user (the queries resolve the session themselves), as a compact JSON
- *  string. Read-only on purpose: the assistant can look, not spend or mutate. */
 const TOOLS = [
   fn("get_wallet_overview", "The user's wallet balance, total spend, and revenue."),
   fn("list_cards", "The user's Cards (agent wallets) with their live USDC balances and caps."),
   fn("list_my_capabilities", "Capabilities the user has published: name, slug, price, status."),
   fn("browse_marketplace", "Capabilities available to buy in the marketplace."),
   fn("get_recent_payments", "The user's recent settled payments (incoming and outgoing)."),
-  fn("get_capability", "Details of one capability by its slug.", {
+  fn("get_capability", "Details of one capability by its slug (name, operations, prices).", {
     slug: { type: "string", description: "The capability's URL slug." },
   }),
+  fn(
+    "run_capability",
+    "Propose running ONE operation of a capability for the user. This does NOT run immediately: it returns a confirmation the user must approve before their card pays. Call it only once you know the capability slug and which operation to run.",
+    {
+      slug: { type: "string", description: "The capability's URL slug." },
+      operation: { type: "string", description: "The operation to run (its slug or name)." },
+      params: { type: "string", description: "Optional query string or JSON body for the op." },
+    },
+  ),
 ];
 
 function fn(name: string, description: string, properties?: Record<string, unknown>) {
@@ -69,6 +77,15 @@ function clip(s: string, n = 4000): string {
   return s.length > n ? `${s.slice(0, n)}… (truncated)` : s;
 }
 
+function kebab(s: string): string {
+  return s
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/** Read-only tools return live data for the signed-in user, as compact JSON. */
 async function runTool(name: string, args: Record<string, unknown>): Promise<string> {
   try {
     switch (name) {
@@ -98,6 +115,64 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<str
   }
 }
 
+/**
+ * Resolve a proposed run: look up the REAL operation price (never trust the
+ * model) and a card that can actually afford it, then return a confirm proposal.
+ * Running is still enforced by the card's on-chain caps + the gateway price when
+ * the user approves, so this only needs to be a good-faith preview.
+ */
+async function proposeRun(
+  args: Record<string, unknown>,
+): Promise<{ reply: string; action: ProposedAction | null }> {
+  const slug = String(args.slug ?? "").trim();
+  const opRef = String(args.operation ?? "").trim();
+  const params = args.params ? String(args.params) : undefined;
+  if (!slug) return { reply: "I need the capability's slug to run it.", action: null };
+
+  const cap = await getPublicCapabilityBySlug(slug);
+  if (!cap) return { reply: `I couldn't find a capability with slug "${slug}".`, action: null };
+
+  const ops = cap.spec?.operations ?? [];
+  const op =
+    ops.find(
+      (o) => (o.slug ?? kebab(o.name)) === opRef || o.name.toLowerCase() === opRef.toLowerCase(),
+    ) ?? ops[0];
+  if (!op) return { reply: `${cap.name} has no runnable operations.`, action: null };
+
+  const price = op.price ?? "0";
+  const total = Number(price);
+
+  const cards = await listAgentWallets();
+  const card = cards.find(
+    (c) => Number(c.usdc) >= total && (!c.policy || total <= Number(c.policy.maxPerCall)),
+  );
+  if (!card) {
+    return {
+      reply:
+        total > 0
+          ? `Running ${op.name} costs $${price} USDC, but none of your cards can pay that right now. Fund a card first.`
+          : `You don't have a card set up yet — create one under Cards first.`,
+      action: null,
+    };
+  }
+
+  const cost = total > 0 ? `pays $${price} USDC from your "${card.name}" card` : "is free";
+  return {
+    reply: `I can run **${op.name}** on ${cap.name} — it ${cost}. Confirm below to run it.`,
+    action: {
+      slug,
+      operation: op.slug ?? kebab(op.name),
+      method: op.method ?? "GET",
+      params,
+      cardId: card.agentId,
+      cardName: card.name,
+      capabilityName: cap.name,
+      operationName: op.name,
+      price,
+    },
+  };
+}
+
 function safeParseArgs(raw: string | undefined): Record<string, unknown> {
   if (!raw) return {};
   try {
@@ -108,10 +183,10 @@ function safeParseArgs(raw: string | undefined): Record<string, unknown> {
   }
 }
 
-function textResponse(body: string, status = 200): Response {
-  return new Response(body, {
-    status,
-    headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+function reply(text: string, action: ProposedAction | null = null): Response {
+  return new Response(JSON.stringify({ reply: text, action }), {
+    status: 200,
+    headers: { "content-type": "application/json", "cache-control": "no-store" },
   });
 }
 
@@ -142,7 +217,6 @@ export async function POST(request: Request) {
   const system =
     DASHBOARD_SYSTEM_PROMPT + (page ? `\n\n## Current page\nThe user is on: ${page}` : "");
 
-  // Last 20 turns keeps context and cost predictable.
   const convo: ChatMessage[] = [
     { role: "system", content: system },
     ...messages.slice(-20).map((m) => ({ role: m.role, content: m.content })),
@@ -174,34 +248,35 @@ export async function POST(request: Request) {
           resp.status,
           await resp.text().catch(() => ""),
         );
-        return textResponse("Sorry, the copilot is unavailable right now. Please try again.");
+        return reply("Sorry, the copilot is unavailable right now. Please try again.");
       }
       data = (await resp.json()) as OpenRouterResponse;
     } catch (error) {
       console.error("[copilot] openrouter request failed:", error);
-      return textResponse("Sorry, something went wrong on my end. Please try again.");
+      return reply("Sorry, something went wrong on my end. Please try again.");
     }
 
     const message = data.choices?.[0]?.message;
-    if (!message) return textResponse("Sorry, I didn't get a response. Please try again.");
+    if (!message) return reply("Sorry, I didn't get a response. Please try again.");
 
-    // The model wants live data → run each tool, feed results back, loop.
     if (message.tool_calls?.length) {
+      // A run proposal is terminal: resolve it and return the confirm card.
+      const run = message.tool_calls.find((c) => c.function.name === "run_capability");
+      if (run) {
+        const { reply: text, action } = await proposeRun(safeParseArgs(run.function.arguments));
+        return reply(text, action);
+      }
+      // Otherwise run the read tools and loop with their results.
       convo.push(message);
       for (const call of message.tool_calls) {
         const out = await runTool(call.function.name, safeParseArgs(call.function.arguments));
-        convo.push({
-          role: "tool",
-          tool_call_id: call.id,
-          name: call.function.name,
-          content: out,
-        });
+        convo.push({ role: "tool", tool_call_id: call.id, name: call.function.name, content: out });
       }
       continue;
     }
 
-    return textResponse(message.content ?? "");
+    return reply(message.content ?? "");
   }
 
-  return textResponse("I couldn't quite finish that — try rephrasing?");
+  return reply("I couldn't quite finish that — try rephrasing?");
 }
