@@ -344,6 +344,9 @@ importers:
       '@trustline-agents/agent-sdk':
         specifier: ^0.2.1
         version: 0.2.1
+      framer-motion:
+        specifier: ^12.42.2
+        version: 12.42.2(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       lucide-react:
         specifier: 'catalog:'
         version: 0.469.0(react@19.2.7)

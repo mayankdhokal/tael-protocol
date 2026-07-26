@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { SIDEBAR_COOKIE_NAME, SidebarInset, SidebarProvider } from "@tael/ui";
 import { AppSidebar } from "../../components/app-shell/sidebar";
 import { Topbar } from "../../components/app-shell/topbar";
+import { TaelAgent } from "../../features/agent";
 import { getSession } from "../../lib/auth";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
@@ -17,6 +18,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         <Topbar />
         <main className="flex-1 space-y-8 p-6 lg:p-8">{children}</main>
       </SidebarInset>
+      <TaelAgent />
     </SidebarProvider>
   );
 }
