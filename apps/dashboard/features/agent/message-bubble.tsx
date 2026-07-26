@@ -100,7 +100,7 @@ function renderInline(s: string): ReactNode[] {
       out.push(<strong key={k++}>{tok.slice(2, -2)}</strong>);
     } else {
       out.push(
-        <code key={k++} className="rounded bg-white/10 px-1 py-0.5 font-mono text-[12px]">
+        <code key={k++} className="break-all rounded bg-white/10 px-1 py-0.5 font-mono text-[12px]">
           {tok.slice(1, -1)}
         </code>,
       );
@@ -118,6 +118,7 @@ function renderInline(s: string): ReactNode[] {
 function Markdown({ text }: { text: string }) {
   const blocks: ReactNode[] = [];
   let list: { ordered: boolean; items: string[] } | null = null;
+  let code: string[] | null = null;
 
   const flush = (key: string) => {
     if (!list) return;
@@ -136,7 +137,34 @@ function Markdown({ text }: { text: string }) {
     list = null;
   };
 
+  const flushCode = (key: string) => {
+    if (code === null) return;
+    blocks.push(
+      <pre
+        key={`c${key}`}
+        className="max-h-64 overflow-auto rounded-lg bg-black/30 p-2.5 font-mono text-[11.5px] leading-relaxed"
+      >
+        <code>{code.join("\n")}</code>
+      </pre>,
+    );
+    code = null;
+  };
+
   text.split("\n").forEach((line, i) => {
+    // ``` fences toggle a scrollable code block (e.g. a JSON result).
+    if (line.trim().startsWith("```")) {
+      if (code === null) {
+        flush(`${i}`);
+        code = [];
+      } else {
+        flushCode(`${i}`);
+      }
+      return;
+    }
+    if (code !== null) {
+      code.push(line);
+      return;
+    }
     const bullet = line.match(/^\s*[*-]\s+(.*)/);
     const number = line.match(/^\s*\d+\.\s+(.*)/);
     if (bullet) {
@@ -155,6 +183,7 @@ function Markdown({ text }: { text: string }) {
     if (line.trim()) blocks.push(<p key={i}>{renderInline(line)}</p>);
   });
   flush("end");
+  flushCode("end");
 
   return <div className="space-y-2 leading-relaxed">{blocks}</div>;
 }
