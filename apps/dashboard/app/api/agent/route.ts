@@ -157,9 +157,40 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<str
   }
 }
 
+// Tael's action fee, mirrored from the settlement path so the preview cost here
+// matches what the card is actually charged (avoids "it's free" then a cap fail).
+const ACTION_FEE_BPS = Number(process.env.TAEL_ACTION_FEE_BPS ?? "100");
+const ACTION_FEE_RATE =
+  process.env.TAEL_FEE_ADDRESS && ACTION_FEE_BPS > 0 ? ACTION_FEE_BPS / 1e4 : 0;
+
+/** Pull a positive `amount` out of a run's params, whether the model formatted
+ *  them as a query string (`to=G…&amount=1`) or JSON (`{"amount":"1"}`). */
+function amountFromParams(params: string | undefined): number | null {
+  const s = params?.trim();
+  if (!s) return null;
+  let raw: string | null | undefined;
+  if (s.startsWith("{")) {
+    try {
+      raw = String((JSON.parse(s) as Record<string, unknown>).amount ?? "");
+    } catch {
+      raw = undefined;
+    }
+  } else {
+    raw = new URLSearchParams(s.replace(/^\?/, "")).get("amount");
+  }
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** A short, human number: no trailing zeros, capped at USDC's 7 decimals. */
+function trimNum(n: number): string {
+  return String(Number(n.toFixed(7)));
+}
+
 /**
- * Resolve a proposed run: look up the REAL operation price (never trust the
- * model) and a card that can actually afford it, then return a confirm proposal.
+ * Resolve a proposed run: price it by what the card is REALLY charged (an
+ * on-chain action moves the amount sent + fee, not the op's free call price),
+ * pick a card that can actually afford it, then return a confirm proposal.
  * Running is still enforced by the card's on-chain caps + the gateway price when
  * the user approves, so this only needs to be a good-faith preview.
  */
@@ -182,23 +213,63 @@ async function proposeRun(
   if (!op) return { reply: `${cap.name} has no runnable operations.`, action: null };
 
   const price = op.price ?? "0";
-  const total = Number(price);
+  // On-chain ACTION ops (Stellar pay/swap) move the amount the user names plus
+  // Tael's fee — not the op's (free) call price. Detect them by their
+  // `tael_action` sample response and price the run by that real spend.
+  const isAction = /tael_action/.test(op.sampleResponse ?? "");
+  const sendAmount = isAction ? amountFromParams(params) : null;
+
+  // An action with no amount (or a pay with no destination) isn't runnable — ask
+  // for the missing value instead of proposing a run that would just fail.
+  if (isAction) {
+    const needsTo = /(^|[?&{"\s])to[=:]/.test(op.sampleRequest ?? "to=");
+    const hasTo = params ? /(^|[?&{"\s])to[=:]/.test(params) : false;
+    if (sendAmount == null || (needsTo && !hasTo)) {
+      return {
+        reply: `To run **${op.name}** I need the amount${needsTo ? " and the destination address" : ""}. Tell me, e.g. "pay 0.5 USDC to G…", and I'll set it up.`,
+        action: null,
+      };
+    }
+  }
+  // The per-call spend the card must cover (cap + balance).
+  const spend =
+    sendAmount != null ? Number((sendAmount * (1 + ACTION_FEE_RATE)).toFixed(7)) : Number(price);
 
   const cards = await listAgentWallets();
-  const card = cards.find(
-    (c) => Number(c.usdc) >= total && (!c.policy || total <= Number(c.policy.maxPerCall)),
-  );
-  if (!card) {
+  if (cards.length === 0) {
     return {
-      reply:
-        total > 0
-          ? `Running ${op.name} costs $${price} USDC, but none of your cards can pay that right now. Fund a card first.`
-          : `You don't have a card set up yet — create one under Cards first.`,
+      reply: `You don't have a card set up yet — create one under Cards first.`,
+      action: null,
+    };
+  }
+  const withinCap = cards.filter((c) => !c.policy || spend <= Number(c.policy.maxPerCall));
+  const card = withinCap.find((c) => Number(c.usdc) >= spend);
+
+  if (!card) {
+    // Nothing can run it — say why, specifically, and how to fix it.
+    if (withinCap.length === 0) {
+      const maxCap = Math.max(...cards.map((c) => Number(c.policy?.maxPerCall ?? 0)));
+      return {
+        reply:
+          sendAmount != null
+            ? `Sending $${trimNum(sendAmount)} USDC costs about $${trimNum(spend)} per call (incl. fee), but your highest per-call cap is $${trimNum(maxCap)}. Raise a card's per-call limit in **Cards → (the card) → Settings**, then ask again — or send a smaller amount.`
+            : `Running ${op.name} costs $${price} USDC, over every card's per-call cap ($${trimNum(maxCap)}). Raise a card's per-call limit first.`,
+        action: null,
+      };
+    }
+    const best = withinCap.reduce((a, b) => (Number(b.usdc) > Number(a.usdc) ? b : a));
+    return {
+      reply: `Your "${best.name}" card can run this, but it only holds $${best.usdc} USDC — it needs about $${trimNum(spend)}. Fund it, then ask again:\n\n\`${best.address}\``,
       action: null,
     };
   }
 
-  const cost = total > 0 ? `pays $${price} USDC from your "${card.name}" card` : "is free";
+  const cost =
+    sendAmount != null
+      ? `sends **$${trimNum(sendAmount)} USDC**${ACTION_FEE_RATE > 0 ? " (plus a small network fee)" : ""} from your "${card.name}" card`
+      : Number(price) > 0
+        ? `pays **$${price} USDC** from your "${card.name}" card`
+        : "is free";
   return {
     reply: `I can run **${op.name}** on ${cap.name} — it ${cost}. Confirm below to run it.`,
     action: {
@@ -211,7 +282,9 @@ async function proposeRun(
       cardName: card.name,
       capabilityName: cap.name,
       operationName: op.name,
-      price,
+      // Show the true per-call cost on the confirm button (the amount + fee for
+      // an action), not the op's free call price.
+      price: sendAmount != null ? trimNum(spend) : price,
     },
   };
 }
