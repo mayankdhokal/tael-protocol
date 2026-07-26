@@ -236,7 +236,7 @@ export function TaelAgent({
                   ))}
                 </div>
               ) : null}
-              <div className="flex items-end gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2 focus-within:border-white/25">
+              <div className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2 focus-within:border-white/25">
                 <button
                   type="button"
                   onClick={startPicking}
