@@ -86,10 +86,10 @@ function SecretBox({ value }: { value: string }) {
   );
 }
 
-/** Inline markdown: **bold** and `code`. */
+/** Inline markdown: **bold**, `code`, and [label](url) links. */
 function renderInline(s: string): ReactNode[] {
   const out: ReactNode[] = [];
-  const re = /(\*\*[^*]+\*\*|`[^`]+`)/g;
+  const re = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)\s]+\))/g;
   let last = 0;
   let k = 0;
   let m: RegExpExecArray | null;
@@ -98,11 +98,28 @@ function renderInline(s: string): ReactNode[] {
     const tok = m[0];
     if (tok.startsWith("**")) {
       out.push(<strong key={k++}>{tok.slice(2, -2)}</strong>);
-    } else {
+    } else if (tok.startsWith("`")) {
       out.push(
         <code key={k++} className="break-all rounded bg-white/10 px-1 py-0.5 font-mono text-[12px]">
           {tok.slice(1, -1)}
         </code>,
+      );
+    } else {
+      const link = tok.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
+      out.push(
+        link ? (
+          <a
+            key={k++}
+            href={link[2]}
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium text-sky-400 underline decoration-sky-400/40 underline-offset-2 transition-colors hover:text-sky-300"
+          >
+            {link[1]}
+          </a>
+        ) : (
+          tok
+        ),
       );
     }
     last = m.index + tok.length;
