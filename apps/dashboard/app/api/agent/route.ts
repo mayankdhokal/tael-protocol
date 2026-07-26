@@ -56,6 +56,19 @@ const TOOLS = [
       params: { type: "string", description: "Optional query string or JSON body for the op." },
     },
   ),
+  fn(
+    "create_card",
+    "Propose creating a new Card (an agent's funded Stellar wallet). Does NOT create it immediately: the user confirms first. Use when the user asks to create/make a card or wallet.",
+    { name: { type: "string", description: "A name for the card, e.g. 'Research'." } },
+  ),
+  fn(
+    "create_api_key",
+    "Propose creating an API key, optionally linked to one of the user's Cards so the key can spend. Does NOT create it immediately: the user confirms first, and the key is shown only once. Use when the user asks to create an API key, or 'an api with <card>'.",
+    {
+      name: { type: "string", description: "A name for the key." },
+      card: { type: "string", description: "Optional Card name to link the key to." },
+    },
+  ),
 ];
 
 function fn(name: string, description: string, properties?: Record<string, unknown>) {
@@ -160,6 +173,7 @@ async function proposeRun(
   return {
     reply: `I can run **${op.name}** on ${cap.name} — it ${cost}. Confirm below to run it.`,
     action: {
+      kind: "run",
       slug,
       operation: op.slug ?? kebab(op.name),
       method: op.method ?? "GET",
@@ -170,6 +184,42 @@ async function proposeRun(
       operationName: op.name,
       price,
     },
+  };
+}
+
+/** Propose creating a new Card (with sensible default limits). */
+function proposeCreateCard(args: Record<string, unknown>): {
+  reply: string;
+  action: ProposedAction;
+} {
+  const name = String(args.name ?? "").trim() || "New Card";
+  return {
+    reply: `I'll create a Card called **${name}** with default limits ($0.10 per call, $5.00 daily). Confirm below.`,
+    action: { kind: "create_card", name, maxPerCall: "0.10", dailyLimit: "5.00" },
+  };
+}
+
+/** Propose creating an API key, resolving an optional Card by name. */
+async function proposeCreateKey(
+  args: Record<string, unknown>,
+): Promise<{ reply: string; action: ProposedAction }> {
+  const name = String(args.name ?? "").trim() || "API key";
+  const cardRef = String(args.card ?? "").trim();
+  let cardId: string | undefined;
+  let cardName: string | undefined;
+  if (cardRef) {
+    const card = (await listAgentWallets()).find(
+      (c) => c.name.toLowerCase() === cardRef.toLowerCase(),
+    );
+    if (card) {
+      cardId = card.agentId;
+      cardName = card.name;
+    }
+  }
+  const link = cardName ? ` linked to your "${cardName}" card` : "";
+  return {
+    reply: `I'll create an API key named **${name}**${link}. You'll see the key only once, copy it right away. Confirm below.`,
+    action: { kind: "create_api_key", name, cardId, cardName },
   };
 }
 
@@ -260,10 +310,22 @@ export async function POST(request: Request) {
     if (!message) return reply("Sorry, I didn't get a response. Please try again.");
 
     if (message.tool_calls?.length) {
-      // A run proposal is terminal: resolve it and return the confirm card.
+      // A write proposal is terminal: resolve it and return a confirm card.
       const run = message.tool_calls.find((c) => c.function.name === "run_capability");
       if (run) {
         const { reply: text, action } = await proposeRun(safeParseArgs(run.function.arguments));
+        return reply(text, action);
+      }
+      const cc = message.tool_calls.find((c) => c.function.name === "create_card");
+      if (cc) {
+        const { reply: text, action } = proposeCreateCard(safeParseArgs(cc.function.arguments));
+        return reply(text, action);
+      }
+      const ck = message.tool_calls.find((c) => c.function.name === "create_api_key");
+      if (ck) {
+        const { reply: text, action } = await proposeCreateKey(
+          safeParseArgs(ck.function.arguments),
+        );
         return reply(text, action);
       }
       // Otherwise run the read tools and loop with their results.

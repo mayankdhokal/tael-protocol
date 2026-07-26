@@ -40,6 +40,19 @@ export function TaelAgent({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, open]);
 
+  // Keyboard shortcut: Cmd/Ctrl + K toggles the copilot. (Cmd+T is the browser's
+  // new-tab shortcut and can't be intercepted, so we use K.)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   // On open: focus the input, clear the unread dot, and ask once for permission
   // to send browser notifications (to nudge when the panel is closed).
   useEffect(() => {
