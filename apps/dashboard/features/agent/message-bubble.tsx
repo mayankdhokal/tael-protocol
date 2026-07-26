@@ -5,6 +5,11 @@ import { motion } from "framer-motion";
 import type { AgentMessage, ProposedAction } from "./types";
 import { DiscordIcon } from "./icons";
 
+/** Truncate a Stellar address for display, e.g. GC62IXD4…LBRK. */
+function shortAddr(a: string): string {
+  return a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a;
+}
+
 /** The confirm card for a proposed action; the label + button follow its kind. */
 function ActionCard({ action, onRun }: { action: ProposedAction; onRun: () => void }) {
   let label: string;
@@ -12,18 +17,36 @@ function ActionCard({ action, onRun }: { action: ProposedAction; onRun: () => vo
   let sub: ReactNode = null;
   let button: string;
   if (action.kind === "run") {
-    label = "Run capability";
+    // A pay/swap carries a send amount (and a pay, a destination): show what it
+    // does, e.g. "Sends $1 USDC to GC62…LBRK", not just the op name.
+    const sending = action.sendAmount != null;
+    label = sending ? "Send payment" : "Run capability";
     title = (
       <>
         {action.operationName} <span className="text-white/50">· {action.capabilityName}</span>
       </>
     );
-    sub = (
+    sub = sending ? (
+      <>
+        Sends <span className="text-white/70">${action.sendAmount} USDC</span>
+        {action.sendTo ? (
+          <>
+            {" "}
+            to <span className="text-white/70">{shortAddr(action.sendTo)}</span>
+          </>
+        ) : null}{" "}
+        · from your <span className="text-white/70">{action.cardName}</span> card
+      </>
+    ) : (
       <>
         Pays from your <span className="text-white/70">{action.cardName}</span> card
       </>
     );
-    button = Number(action.price) > 0 ? `Run · $${action.price} USDC` : "Run · free";
+    button = sending
+      ? `Send · $${action.sendAmount} USDC`
+      : Number(action.price) > 0
+        ? `Run · $${action.price} USDC`
+        : "Run · free";
   } else if (action.kind === "create_card") {
     label = "Create card";
     title = action.name;
