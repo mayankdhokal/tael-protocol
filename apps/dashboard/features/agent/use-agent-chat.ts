@@ -153,9 +153,9 @@ export function useAgentChat(endpoint: string) {
         });
         patch({
           content: r.ok
-            ? `Ran ${action.operationName}${Number(r.paid) > 0 ? ` · paid $${r.paid} USDC` : " · free"}.` +
-              (r.borrowed ? ` Borrowed $${r.borrowed} from TrustLine.` : "") +
-              `\n\n${formatBody(r.body)}`
+            ? `**Ran ${action.operationName}**${Number(r.paid) > 0 ? ` · paid $${r.paid} USDC` : " · free"}` +
+              (r.borrowed ? ` · borrowed $${r.borrowed} from TrustLine` : "") +
+              (r.body ? `\n\n\`\`\`json\n${formatBody(r.body)}\n\`\`\`` : "")
             : `Couldn't run it: ${r.error ?? "something went wrong"}`,
         });
       } else if (action.kind === "create_card") {
@@ -166,8 +166,9 @@ export function useAgentChat(endpoint: string) {
         });
         if (r.ok) {
           const steps = r.ready
-            ? "It's provisioned and ready. Send **USDC** to its address to fund it:"
-            : `To activate it: send **~1.5 XLM** to the address below, then it can hold a USDC trustline, then send **USDC** to fund it.${r.provisionError ? ` (${r.provisionError})` : ""}`;
+            ? "It's funded with XLM and has a USDC trustline, so it's ready to spend. To top it up, send **USDC** to its address:"
+            : "To activate it:\n\n1. Send **~1.5 XLM** to the address below (covers the account reserve + a USDC trustline).\n2. Then send **USDC** to fund it." +
+              (r.provisionError ? `\n\n(${r.provisionError})` : "");
           patch({ content: `Created your **${action.name}** card. ${steps}\n\n\`${r.address}\`` });
         } else {
           patch({ content: `Couldn't create the card: ${r.error}` });

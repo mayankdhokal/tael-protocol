@@ -16,6 +16,9 @@ import { getWalletOverview } from "../../../features/wallet/queries";
 // card pays. Talks to OpenRouter (default Gemini 2.5 Flash, swappable). Node
 // runtime: reads a server-only key and touches server-only queries.
 export const runtime = "nodejs";
+// The tool loop makes several model calls; give it room so multi-step asks
+// (e.g. "run the TrustLine capability") don't hit the default function timeout.
+export const maxDuration = 60;
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MODEL = process.env.OPENROUTER_MODEL ?? "google/gemini-2.5-flash";
@@ -98,6 +101,24 @@ function kebab(s: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+/** Trim a capability to what the model needs to find + run it, so the whole
+ *  marketplace fits in one tool result instead of being clipped after the first. */
+function compactCap(c: Awaited<ReturnType<typeof listPublicCapabilities>>[number]) {
+  return {
+    name: c.name,
+    slug: c.slug,
+    kind: c.kind,
+    price: c.price,
+    status: c.status,
+    operations: c.spec?.operations?.map((o) => ({
+      name: o.name,
+      slug: o.slug ?? kebab(o.name),
+      price: o.price,
+    })),
+    description: c.description ? c.description.slice(0, 140) : undefined,
+  };
+}
+
 /** Read-only tools return live data for the signed-in user, as compact JSON. */
 async function runTool(name: string, args: Record<string, unknown>): Promise<string> {
   try {
@@ -107,9 +128,9 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<str
       case "list_cards":
         return clip(JSON.stringify(await listAgentWallets()));
       case "list_my_capabilities":
-        return clip(JSON.stringify(await listMyCapabilities()));
+        return clip(JSON.stringify((await listMyCapabilities()).map(compactCap)));
       case "browse_marketplace":
-        return clip(JSON.stringify(await listPublicCapabilities()));
+        return clip(JSON.stringify((await listPublicCapabilities()).map(compactCap)));
       case "get_recent_payments":
         return clip(JSON.stringify(await getPaymentsData()));
       case "get_capability": {
