@@ -52,6 +52,9 @@ export interface AgentMessage {
   actionDone?: boolean;
   /** A one-time secret to reveal securely (e.g. a freshly created API key). */
   secret?: string;
+  /** Screenshots of page blocks the user attached (data URLs), shown inline and
+   *  sent to the (multimodal) model so it can reason about what's on screen. */
+  attachments?: string[];
 }
 
 /** Props for the reusable widget, all optional so `<TaelAgent />` just works. */

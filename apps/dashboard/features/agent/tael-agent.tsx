@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Trash2 } from "lucide-react";
+import { Crosshair, Trash2, X } from "lucide-react";
 import { AGENT_NAME, AGENT_TAGLINE, INTRO_MESSAGE, SUGGESTED_QUESTIONS } from "./knowledge";
 import { useAgentChat } from "./use-agent-chat";
 import { MessageBubble } from "./message-bubble";
+import { ElementPicker } from "./element-picker";
 import { ChatSmileIcon, ChevronDownIcon, CloseIcon, SendIcon, TaelLogoMark } from "./icons";
 import { ensureNotifyPermission, playChime, sendBrowserNotification } from "./notify";
 import type { TaelAgentProps } from "./types";
@@ -29,6 +30,9 @@ export function TaelAgent({
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [unread, setUnread] = useState(0);
+  // Element-picker: capture a page block and attach it to the next message.
+  const [picking, setPicking] = useState(false);
+  const [attachments, setAttachments] = useState<string[]>([]);
   const { messages, streaming, send, runAction, clear } = useAgentChat(endpoint);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -90,16 +94,25 @@ export function TaelAgent({
   }, [streaming, open, messages]);
 
   function submit(text: string) {
-    if (streaming || !text.trim()) return;
+    if (streaming || (!text.trim() && attachments.length === 0)) return;
     void playChime();
-    void send(text);
+    void send(text, attachments.length ? attachments : undefined);
     setDraft("");
+    setAttachments([]);
+  }
+
+  // Enter pick mode: hide the panel so the whole page is selectable; restore it
+  // (with the capture attached) when a block is picked or the user cancels.
+  function startPicking() {
+    setPicking(true);
+    setOpen(false);
   }
 
   return (
     <>
       {/* Launcher */}
       <motion.button
+        data-tael-agent
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? "Close the Tael assistant" : "Open the Tael assistant"}
@@ -129,6 +142,7 @@ export function TaelAgent({
       <AnimatePresence>
         {open && (
           <motion.div
+            data-tael-agent
             initial={{ opacity: 0, y: 16, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.98 }}
@@ -200,7 +214,38 @@ export function TaelAgent({
               }}
               className="p-3"
             >
-              <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 focus-within:border-white/25">
+              {attachments.length > 0 ? (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {attachments.map((src, i) => (
+                    <div key={i} className="relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- user-captured data URL, dynamic size */}
+                      <img
+                        src={src}
+                        alt="Captured page block"
+                        className="h-14 w-auto max-w-[120px] rounded-lg border border-white/10 object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setAttachments((a) => a.filter((_, j) => j !== i))}
+                        aria-label="Remove attachment"
+                        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#14161a] text-white ring-1 ring-white/20 transition-colors hover:bg-black"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              <div className="flex items-end gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2 focus-within:border-white/25">
+                <button
+                  type="button"
+                  onClick={startPicking}
+                  aria-label="Capture a block from the page"
+                  title="Capture a block from the page"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+                >
+                  <Crosshair className="h-[18px] w-[18px]" />
+                </button>
                 <textarea
                   ref={inputRef}
                   value={draft}
@@ -217,7 +262,7 @@ export function TaelAgent({
                 />
                 <button
                   type="submit"
-                  disabled={!draft.trim() || streaming}
+                  disabled={(!draft.trim() && attachments.length === 0) || streaming}
                   aria-label="Send"
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#14161a] transition-all duration-150 ease-out hover:bg-white/90 active:scale-95 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/40"
                 >
@@ -231,6 +276,20 @@ export function TaelAgent({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {picking ? (
+        <ElementPicker
+          onCapture={(url) => {
+            setAttachments((a) => [...a, url]);
+            setPicking(false);
+            setOpen(true);
+          }}
+          onCancel={() => {
+            setPicking(false);
+            setOpen(true);
+          }}
+        />
+      ) : null}
     </>
   );
 }

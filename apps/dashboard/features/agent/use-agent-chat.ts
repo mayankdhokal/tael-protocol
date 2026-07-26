@@ -97,21 +97,30 @@ export function useAgentChat(endpoint: string) {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+      // Don't persist attachment data URLs — they're large and would blow the
+      // localStorage quota; the transcript text is what's worth keeping.
+      const slim = messages.map((m) => (m.attachments ? { ...m, attachments: undefined } : m));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(slim));
     } catch {
       // ignore — private mode / quota; persistence is a nice-to-have
     }
   }, [messages]);
 
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, attachments?: string[]) => {
       const content = text.trim();
-      if (!content || busy.current) return;
+      if ((!content && !attachments?.length) || busy.current) return;
       busy.current = true;
       setStreaming(true);
 
       const now = Date.now();
-      const userMsg: AgentMessage = { id: nextId(), role: "user", content, createdAt: now };
+      const userMsg: AgentMessage = {
+        id: nextId(),
+        role: "user",
+        content,
+        createdAt: now,
+        ...(attachments?.length ? { attachments } : {}),
+      };
       const assistantId = nextId();
       const history = [...messages, userMsg];
       setMessages([
@@ -124,7 +133,11 @@ export function useAgentChat(endpoint: string) {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
-            messages: history.map((m) => ({ role: m.role, content: m.content })),
+            messages: history.map((m) => ({
+              role: m.role,
+              content: m.content,
+              ...(m.attachments?.length ? { attachments: m.attachments } : {}),
+            })),
             pageContext: { path: pathname },
           }),
         });
