@@ -284,9 +284,12 @@ export async function POST(request: Request) {
     return jsonError("The last message must be from the user.", 400);
   }
 
+  const network = process.env.NEXT_PUBLIC_STELLAR_NETWORK === "mainnet" ? "mainnet" : "testnet";
   const page = body?.pageContext?.path;
   const system =
-    DASHBOARD_SYSTEM_PROMPT + (page ? `\n\n## Current page\nThe user is on: ${page}` : "");
+    DASHBOARD_SYSTEM_PROMPT +
+    `\n\n## This dashboard\nThis dashboard is running on Stellar **${network}**.` +
+    (page ? ` The user is on: ${page}` : "");
 
   const convo: ChatMessage[] = [
     { role: "system", content: system },

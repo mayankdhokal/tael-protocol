@@ -1,5 +1,5 @@
 import "server-only";
-import { agents, eq, wallets } from "@tael/database";
+import { agents, eq, inArray, payments, sql, wallets } from "@tael/database";
 import { Money } from "@tael/types";
 import { db } from "../../lib/db";
 import { getSession } from "../../lib/auth";
@@ -16,9 +16,13 @@ export interface WalletOverview {
   xlm: string;
   /** Whether the connected wallet holds a USDC trustline. */
   hasUsdc: boolean;
-  /** Combined USDC held across the user's agent hot wallets. */
+  /** Combined USDC held across the user's agent hot wallets (a BALANCE, not earnings). */
   agentsUsdc: string;
   agentCount: number;
+  /** Total USDC the user has EARNED (received to any of their wallets), from the ledger. */
+  revenue: string;
+  /** Total USDC the user has SPENT (paid from any of their wallets), from the ledger. */
+  spend: string;
 }
 
 async function fetchXlm(address: string): Promise<{ xlm: string; hasUsdc: boolean }> {
@@ -56,6 +60,8 @@ export async function getWalletOverview(): Promise<WalletOverview> {
 
   let agentsUsdc = Money.zero();
   let agentCount = 0;
+  let revenue = "0";
+  let spend = "0";
   if (user) {
     const rows = await db
       .select({ address: wallets.address })
@@ -65,6 +71,23 @@ export async function getWalletOverview(): Promise<WalletOverview> {
     agentCount = rows.length;
     const balances = await Promise.all(rows.map((r) => fetchUsdcBalance(r.address)));
     agentsUsdc = balances.reduce((sum, b) => sum.add(Money.parse(b.usdc)), Money.zero());
+
+    // Earnings vs spend from the ledger: USDC received to, vs paid from, any of
+    // the user's addresses (their connected wallet + every Card). This is real
+    // revenue — not to be confused with the balances above.
+    const addrs = [address, ...rows.map((r) => r.address)].filter((a): a is string => !!a);
+    if (addrs.length) {
+      const [rev] = await db
+        .select({ v: sql<string>`coalesce(sum(${payments.amount}), 0)` })
+        .from(payments)
+        .where(inArray(payments.payee, addrs));
+      const [sp] = await db
+        .select({ v: sql<string>`coalesce(sum(${payments.amount} + ${payments.fee}), 0)` })
+        .from(payments)
+        .where(inArray(payments.payer, addrs));
+      revenue = rev?.v ?? "0";
+      spend = sp?.v ?? "0";
+    }
   }
 
   return {
@@ -74,5 +97,7 @@ export async function getWalletOverview(): Promise<WalletOverview> {
     hasUsdc: xlm.hasUsdc,
     agentsUsdc: agentsUsdc.toDecimalString(),
     agentCount,
+    revenue,
+    spend,
   };
 }
