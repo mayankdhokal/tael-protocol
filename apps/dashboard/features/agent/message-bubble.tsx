@@ -1,9 +1,90 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import type { AgentMessage, ProposedAction } from "./types";
 import { DiscordIcon } from "./icons";
+
+/** The confirm card for a proposed action; the label + button follow its kind. */
+function ActionCard({ action, onRun }: { action: ProposedAction; onRun: () => void }) {
+  let label: string;
+  let title: ReactNode;
+  let sub: ReactNode = null;
+  let button: string;
+  if (action.kind === "run") {
+    label = "Run capability";
+    title = (
+      <>
+        {action.operationName} <span className="text-white/50">· {action.capabilityName}</span>
+      </>
+    );
+    sub = (
+      <>
+        Pays from your <span className="text-white/70">{action.cardName}</span> card
+      </>
+    );
+    button = Number(action.price) > 0 ? `Run · $${action.price} USDC` : "Run · free";
+  } else if (action.kind === "create_card") {
+    label = "Create card";
+    title = action.name;
+    sub = `Limits: $${action.maxPerCall}/call · $${action.dailyLimit}/day`;
+    button = "Create card";
+  } else {
+    label = "Create API key";
+    title = action.name;
+    sub = action.cardName ? (
+      <>
+        Linked to your <span className="text-white/70">{action.cardName}</span> card · shown once
+      </>
+    ) : (
+      "Shown only once — copy it right away"
+    );
+    button = "Create key";
+  }
+  return (
+    <div className="w-full max-w-[85%] rounded-2xl border border-white/10 bg-[#1c1d21] p-3">
+      <p className="text-[11px] uppercase tracking-wide text-white/40">{label}</p>
+      <p className="mt-0.5 text-[13.5px] font-medium text-zinc-100">{title}</p>
+      {sub ? <p className="mt-0.5 text-[12px] text-white/50">{sub}</p> : null}
+      <button
+        type="button"
+        onClick={onRun}
+        className="mt-2.5 w-full rounded-lg bg-white px-3 py-1.5 text-[13px] font-medium text-[#14161a] transition-all duration-150 ease-out hover:bg-white/90 active:scale-[0.98]"
+      >
+        {button}
+      </button>
+    </div>
+  );
+}
+
+/** A one-time secret (e.g. a freshly created API key): mono value + copy button. */
+function SecretBox({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="w-full max-w-[85%] rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] p-3">
+      <p className="text-[11px] uppercase tracking-wide text-amber-300/80">
+        Your key — copy it now
+      </p>
+      <div className="mt-1.5 flex items-center gap-2">
+        <code className="min-w-0 flex-1 truncate rounded bg-black/30 px-2 py-1.5 font-mono text-[12px] text-zinc-100">
+          {value}
+        </code>
+        <button
+          type="button"
+          onClick={() => {
+            void navigator.clipboard.writeText(value);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          }}
+          className="shrink-0 rounded-md bg-white/10 px-2.5 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-white/20"
+        >
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+      <p className="mt-1.5 text-[11px] text-white/40">You won&apos;t be able to see this again.</p>
+    </div>
+  );
+}
 
 /** Inline markdown: **bold** and `code`. */
 function renderInline(s: string): ReactNode[] {
@@ -181,26 +262,13 @@ export function MessageBubble({
       ) : null}
 
       {message.action && !message.actionDone ? (
-        <div className="w-full max-w-[85%] rounded-2xl border border-white/10 bg-[#1c1d21] p-3">
-          <p className="text-[11px] uppercase tracking-wide text-white/40">Run capability</p>
-          <p className="mt-0.5 text-[13.5px] font-medium text-zinc-100">
-            {message.action.operationName}{" "}
-            <span className="text-white/50">· {message.action.capabilityName}</span>
-          </p>
-          <p className="mt-0.5 text-[12px] text-white/50">
-            Pays from your <span className="text-white/70">{message.action.cardName}</span> card
-          </p>
-          <button
-            type="button"
-            onClick={() => onRunAction?.(message.id, message.action!)}
-            className="mt-2.5 w-full rounded-lg bg-white px-3 py-1.5 text-[13px] font-medium text-[#14161a] transition-all duration-150 ease-out hover:bg-white/90 active:scale-[0.98]"
-          >
-            {Number(message.action.price) > 0
-              ? `Run · $${message.action.price} USDC`
-              : "Run · free"}
-          </button>
-        </div>
+        <ActionCard
+          action={message.action}
+          onRun={() => onRunAction?.(message.id, message.action!)}
+        />
       ) : null}
+
+      {message.secret ? <SecretBox value={message.secret} /> : null}
 
       {!isUser && showMeta && !empty ? (
         <span className="text-xs text-white/40">

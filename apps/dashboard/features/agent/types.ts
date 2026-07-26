@@ -1,6 +1,7 @@
-/** A capability run the copilot proposes. It never runs on its own — the user
- *  confirms first, then the card pays. Resolved server-side (card + price). */
-export interface ProposedAction {
+/** Run a capability. It never runs on its own — the user confirms first, then
+ *  the card pays. Resolved server-side (card + real price). */
+export interface RunAction {
+  kind: "run";
   slug: string;
   operation?: string;
   method?: string;
@@ -15,6 +16,25 @@ export interface ProposedAction {
   price: string;
 }
 
+/** Create a new Card (agent wallet). */
+export interface CreateCardAction {
+  kind: "create_card";
+  name: string;
+  maxPerCall: string;
+  dailyLimit: string;
+}
+
+/** Create an API key, optionally linked to a Card. */
+export interface CreateKeyAction {
+  kind: "create_api_key";
+  name: string;
+  cardId?: string;
+  cardName?: string;
+}
+
+/** Something the copilot proposes doing; the user confirms before it happens. */
+export type ProposedAction = RunAction | CreateCardAction | CreateKeyAction;
+
 export interface AgentMessage {
   id: string;
   role: "user" | "assistant";
@@ -25,6 +45,8 @@ export interface AgentMessage {
   action?: ProposedAction;
   /** True once the proposed action has been run, so the confirm card collapses. */
   actionDone?: boolean;
+  /** A one-time secret to reveal securely (e.g. a freshly created API key). */
+  secret?: string;
 }
 
 /** Props for the reusable widget, all optional so `<TaelAgent />` just works. */

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { createAgent } from "../agents/actions";
+import { createApiKey } from "../api-keys/actions";
 import { runCapability } from "../agents/run-capability";
 import type { AgentMessage, ProposedAction } from "./types";
 
@@ -115,7 +117,8 @@ export function useAgentChat(endpoint: string) {
     [endpoint, messages, pathname],
   );
 
-  /** Run a proposed capability the user just confirmed, then append the result. */
+  /** Carry out an action the user just confirmed (run a capability, create a
+   *  Card, or create an API key), then append the result. */
   const runAction = useCallback(async (messageId: string, action: ProposedAction) => {
     if (busy.current) return;
     busy.current = true;
@@ -123,31 +126,65 @@ export function useAgentChat(endpoint: string) {
     // Collapse the confirm card on the proposing message.
     setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, actionDone: true } : m)));
     const resultId = nextId();
+    const working =
+      action.kind === "run"
+        ? "Running…"
+        : action.kind === "create_card"
+          ? "Creating your card…"
+          : "Creating your key…";
     setMessages((prev) => [
       ...prev,
-      { id: resultId, role: "assistant", content: "Running…", createdAt: Date.now() },
+      { id: resultId, role: "assistant", content: working, createdAt: Date.now() },
     ]);
 
-    const isGet = (action.method ?? "GET").toUpperCase() === "GET";
+    const patch = (fields: Partial<AgentMessage>) =>
+      setMessages((prev) => prev.map((m) => (m.id === resultId ? { ...m, ...fields } : m)));
+
     try {
-      const r = await runCapability({
-        agentId: action.cardId,
-        slug: action.slug,
-        operation: action.operation,
-        method: action.method,
-        body: isGet ? undefined : action.params,
-        query: isGet ? action.params : undefined,
-      });
-      const text = r.ok
-        ? `Ran ${action.operationName}${Number(r.paid) > 0 ? ` · paid $${r.paid} USDC` : " · free"}.` +
-          (r.borrowed ? ` Borrowed $${r.borrowed} from TrustLine.` : "") +
-          `\n\n${formatBody(r.body)}`
-        : `Couldn't run it: ${r.error ?? "something went wrong"}`;
-      setMessages((prev) => prev.map((m) => (m.id === resultId ? { ...m, content: text } : m)));
+      if (action.kind === "run") {
+        const isGet = (action.method ?? "GET").toUpperCase() === "GET";
+        const r = await runCapability({
+          agentId: action.cardId,
+          slug: action.slug,
+          operation: action.operation,
+          method: action.method,
+          body: isGet ? undefined : action.params,
+          query: isGet ? action.params : undefined,
+        });
+        patch({
+          content: r.ok
+            ? `Ran ${action.operationName}${Number(r.paid) > 0 ? ` · paid $${r.paid} USDC` : " · free"}.` +
+              (r.borrowed ? ` Borrowed $${r.borrowed} from TrustLine.` : "") +
+              `\n\n${formatBody(r.body)}`
+            : `Couldn't run it: ${r.error ?? "something went wrong"}`,
+        });
+      } else if (action.kind === "create_card") {
+        const r = await createAgent({
+          name: action.name,
+          maxPerCall: action.maxPerCall,
+          dailyLimit: action.dailyLimit,
+        });
+        if (r.ok) {
+          const steps = r.ready
+            ? "It's provisioned and ready. Send **USDC** to its address to fund it:"
+            : `To activate it: send **~1.5 XLM** to the address below, then it can hold a USDC trustline, then send **USDC** to fund it.${r.provisionError ? ` (${r.provisionError})` : ""}`;
+          patch({ content: `Created your **${action.name}** card. ${steps}\n\n\`${r.address}\`` });
+        } else {
+          patch({ content: `Couldn't create the card: ${r.error}` });
+        }
+      } else {
+        const r = await createApiKey(action.name, action.cardId ?? null);
+        if (r.ok) {
+          patch({
+            content: `Created API key **${action.name}**${action.cardName ? ` linked to your ${action.cardName} card` : ""}. Copy it now — you won't be able to see it again.`,
+            secret: r.key,
+          });
+        } else {
+          patch({ content: `Couldn't create the key: ${r.error}` });
+        }
+      }
     } catch {
-      setMessages((prev) =>
-        prev.map((m) => (m.id === resultId ? { ...m, content: "Sorry, that didn't run." } : m)),
-      );
+      patch({ content: "Sorry, that didn't complete." });
     } finally {
       busy.current = false;
       setStreaming(false);
