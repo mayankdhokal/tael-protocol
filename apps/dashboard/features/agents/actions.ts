@@ -14,6 +14,17 @@ const USDC_ISSUER = process.env.USDC_ISSUER ?? "";
 const nameSchema = z.string().trim().min(1, "Name is required").max(60);
 const amountSchema = z.string().regex(/^\d+(\.\d+)?$/, "Enter an amount, e.g. 0.10");
 
+/**
+ * Resolve `p`, but give up after `ms` and resolve `onTimeout` instead. Wallet
+ * provisioning does network I/O (friendbot fund + trustline) that can outlast a
+ * serverless function's budget — if the whole action ran that long the transport
+ * call would reject on the client even though the agent row was already written.
+ * Capping the wait keeps createAgent snappy; provisioning stays retryable.
+ */
+function withTimeout<T>(p: Promise<T>, ms: number, onTimeout: T): Promise<T> {
+  return Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(onTimeout), ms))]);
+}
+
 const createAgentSchema = z.object({
   name: nameSchema,
   maxPerCall: amountSchema,
@@ -82,12 +93,16 @@ export async function createAgent(input: {
   // defensively so a provisioning fault can never crash the create action.
   let provision: { ok: boolean; ready: boolean; error?: string };
   try {
-    provision = await provisionHotWallet({
-      secret: keypair.secret,
-      network: STELLAR_NETWORK,
-      horizonUrl: HORIZON_URL,
-      usdcIssuer: USDC_ISSUER,
-    });
+    provision = await withTimeout(
+      provisionHotWallet({
+        secret: keypair.secret,
+        network: STELLAR_NETWORK,
+        horizonUrl: HORIZON_URL,
+        usdcIssuer: USDC_ISSUER,
+      }),
+      12_000,
+      { ok: false, ready: false, error: "Still provisioning — retry from the card in a moment." },
+    );
   } catch (error) {
     console.error("[agents] provision threw:", error);
     provision = { ok: false, ready: false, error: "Provisioning failed. Retry from the agent." };

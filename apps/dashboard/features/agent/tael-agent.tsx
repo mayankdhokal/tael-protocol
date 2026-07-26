@@ -35,6 +35,13 @@ export function TaelAgent({
   const wasStreaming = useRef(false);
   const askedPermission = useRef(false);
 
+  // Pre-warm the gateway on mount so the first paid call in a demo isn't slow
+  // from a cold start. Fire-and-forget and silent — no UI, errors ignored.
+  useEffect(() => {
+    const base = process.env.NEXT_PUBLIC_API_URL;
+    if (base) void fetch(`${base}/health`, { cache: "no-store" }).catch(() => {});
+  }, []);
+
   // Keep the transcript pinned to the latest message as it streams in.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });

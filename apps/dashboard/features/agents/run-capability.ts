@@ -61,6 +61,8 @@ export interface RunResult {
   paid?: string;
   /** USDC drawn from TrustLine credit to cover a shortfall on this call, if any. */
   borrowed?: string;
+  /** The Stellar settlement tx hash, for an on-chain proof link. */
+  txHash?: string;
   error?: string;
 }
 
@@ -331,7 +333,20 @@ export async function runCapability(input: {
       const buffer = agent.policy?.maxPerCall ?? total.toDecimalString();
       await maybeRepayTrustLineCredit(secretEnc, buffer);
     }
-    return { ok: true, status: res.status, body, paid: total.toDecimalString(), borrowed };
+    // Pull the settlement tx hash out of the gateway's receipt header, for an
+    // on-chain proof link. Best-effort — no link if it can't be decoded.
+    let txHash: string | undefined;
+    const receiptHeader = res.headers.get("x-payment-response");
+    if (receiptHeader) {
+      try {
+        txHash = (
+          JSON.parse(Buffer.from(receiptHeader, "base64").toString("utf8")) as { txHash?: string }
+        ).txHash;
+      } catch {
+        // ignore
+      }
+    }
+    return { ok: true, status: res.status, body, paid: total.toDecimalString(), borrowed, txHash };
   } catch {
     return { ok: false, error: "Couldn't reach the capability. Try again." };
   }
@@ -432,7 +447,13 @@ async function runPayAction(
       asset: "USDC",
       txHash: receipt.txHash,
     };
-    return { ok: true, status: 200, body: JSON.stringify(result), paid: total.toDecimalString() };
+    return {
+      ok: true,
+      status: 200,
+      body: JSON.stringify(result),
+      paid: total.toDecimalString(),
+      txHash: receipt.txHash,
+    };
   } catch (error) {
     console.error("[run] pay action failed:", error);
     return {
@@ -614,7 +635,13 @@ async function runSwapAction(
       fee: feeStr,
       txHash: receipt.txHash,
     };
-    return { ok: true, status: 200, body: JSON.stringify(result), paid: usdcOut.toDecimalString() };
+    return {
+      ok: true,
+      status: 200,
+      body: JSON.stringify(result),
+      paid: usdcOut.toDecimalString(),
+      txHash: receipt.txHash,
+    };
   } catch (error) {
     console.error("[run] swap action failed:", error);
     return {

@@ -56,7 +56,11 @@ const TOOLS = [
     {
       slug: { type: "string", description: "The capability's URL slug." },
       operation: { type: "string", description: "The operation to run (its slug or name)." },
-      params: { type: "string", description: "Optional query string or JSON body for the op." },
+      params: {
+        type: "string",
+        description:
+          "The op's parameters, formatted exactly like its `sample` field. For action ops (e.g. Stellar 'pay' or 'swap') this is required — pass every key the sample shows, e.g. `to=G…&amount=1.5`. Ask the user for any value you don't have (like the destination address or amount) before proposing the run.",
+      },
     },
   ),
   fn(
@@ -114,6 +118,10 @@ function compactCap(c: Awaited<ReturnType<typeof listPublicCapabilities>>[number
       name: o.name,
       slug: o.slug ?? kebab(o.name),
       price: o.price,
+      method: o.method ?? "GET",
+      // How params are shaped for this op (e.g. `to=G…&amount=1.5`) so the model
+      // fills them correctly when it proposes a run.
+      sample: o.sampleRequest,
     })),
     description: c.description ? c.description.slice(0, 140) : undefined,
   };

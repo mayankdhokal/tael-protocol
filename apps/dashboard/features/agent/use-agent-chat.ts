@@ -16,6 +16,11 @@ function nextId(): string {
 /** Persist the conversation so context survives a reload or navigating away. */
 const STORAGE_KEY = "tael-copilot-chat";
 
+/** stellar.expert explorer base for the current network — for on-chain proof links. */
+const STELLAR_EXPERT_TX = `https://stellar.expert/explorer/${
+  process.env.NEXT_PUBLIC_STELLAR_NETWORK === "mainnet" ? "public" : "testnet"
+}/tx/`;
+
 function loadMessages(): AgentMessage[] {
   if (typeof window === "undefined") return [];
   try {
@@ -23,6 +28,42 @@ function loadMessages(): AgentMessage[] {
     return raw ? (JSON.parse(raw) as AgentMessage[]) : [];
   } catch {
     return [];
+  }
+}
+
+/**
+ * The model returns an op's params as one freeform string. Coerce it to the
+ * shape the op's METHOD needs — a query string for GET, a JSON body for POST —
+ * so a Stellar pay works whether the model emitted `to=G…&amount=1` or
+ * `{"to":"G…","amount":"1"}`. Without this, a JSON string handed to a GET op
+ * lands as one junk query key and the op 400s for a missing `to`/`amount`.
+ */
+function paramsForMethod(raw: string | undefined, isGet: boolean): string | undefined {
+  const s = raw?.trim();
+  if (!s) return undefined;
+  const looksJson = s.startsWith("{");
+  if (isGet) {
+    if (!looksJson) return s.replace(/^\?/, "");
+    try {
+      const obj = JSON.parse(s) as Record<string, unknown>;
+      return new URLSearchParams(
+        Object.entries(obj)
+          .filter(([, v]) => v != null && v !== "")
+          .map(([k, v]) => [k, String(v)]),
+      ).toString();
+    } catch {
+      return s;
+    }
+  }
+  if (looksJson) return s;
+  try {
+    const obj: Record<string, string> = {};
+    new URLSearchParams(s.replace(/^\?/, "")).forEach((v, k) => {
+      obj[k] = v;
+    });
+    return JSON.stringify(obj);
+  } catch {
+    return s;
   }
 }
 
@@ -143,18 +184,20 @@ export function useAgentChat(endpoint: string) {
     try {
       if (action.kind === "run") {
         const isGet = (action.method ?? "GET").toUpperCase() === "GET";
+        const params = paramsForMethod(action.params, isGet);
         const r = await runCapability({
           agentId: action.cardId,
           slug: action.slug,
           operation: action.operation,
           method: action.method,
-          body: isGet ? undefined : action.params,
-          query: isGet ? action.params : undefined,
+          body: isGet ? undefined : params,
+          query: isGet ? params : undefined,
         });
         patch({
           content: r.ok
             ? `**Ran ${action.operationName}**${Number(r.paid) > 0 ? ` · paid $${r.paid} USDC` : " · free"}` +
               (r.borrowed ? ` · borrowed $${r.borrowed} from TrustLine` : "") +
+              (r.txHash ? `\n\n[View on-chain proof ↗](${STELLAR_EXPERT_TX}${r.txHash})` : "") +
               (r.body ? `\n\n\`\`\`json\n${formatBody(r.body)}\n\`\`\`` : "")
             : `Couldn't run it: ${r.error ?? "something went wrong"}`,
         });
