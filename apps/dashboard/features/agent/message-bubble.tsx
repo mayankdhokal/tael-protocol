@@ -295,6 +295,19 @@ export function MessageBubble({
       transition={{ duration: 0.2, ease: "easeOut" }}
       className={`flex flex-col gap-1.5 ${isUser ? "items-end" : "items-start"}`}
     >
+      {message.attachments?.length ? (
+        <div className="flex flex-wrap justify-end gap-1.5">
+          {message.attachments.map((src, i) => (
+            // eslint-disable-next-line @next/next/no-img-element -- user-captured data URL, dynamic size
+            <img
+              key={i}
+              src={src}
+              alt="Captured page block"
+              className="max-h-40 w-auto max-w-[85%] rounded-xl border border-white/10 object-contain"
+            />
+          ))}
+        </div>
+      ) : null}
       {showBubble ? (
         <div
           className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13.5px] leading-relaxed ${

@@ -30,9 +30,12 @@ interface ToolCall {
   id: string;
   function: { name: string; arguments: string };
 }
+/** A multimodal content part (text or an image data URL), for attached blocks. */
+type ContentPart =
+  { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
 interface ChatMessage {
   role: string;
-  content: string | null;
+  content: string | ContentPart[] | null;
   tool_calls?: ToolCall[];
   tool_call_id?: string;
   name?: string;
@@ -357,7 +360,7 @@ function jsonError(message: string, status: number): Response {
 }
 
 interface AgentRequestBody {
-  messages?: { role: "user" | "assistant"; content: string }[];
+  messages?: { role: "user" | "assistant"; content: string; attachments?: string[] }[];
   pageContext?: { path?: string };
 }
 
@@ -377,11 +380,22 @@ export async function POST(request: Request) {
   const system =
     DASHBOARD_SYSTEM_PROMPT +
     `\n\n## This dashboard\nThis dashboard is running on Stellar **${network}**.` +
-    (page ? ` The user is on: ${page}` : "");
+    (page ? ` The user is on: ${page}` : "") +
+    `\n\nThe user can attach a screenshot of a block on this page. When one is attached, read it and answer about exactly what's shown.`;
 
   const convo: ChatMessage[] = [
     { role: "system", content: system },
-    ...messages.slice(-20).map((m) => ({ role: m.role, content: m.content })),
+    ...messages.slice(-20).map((m) => ({
+      role: m.role,
+      // A message with attached block screenshots becomes multimodal content so
+      // the (vision) model can actually see what's on the user's screen.
+      content: m.attachments?.length
+        ? ([
+            { type: "text", text: m.content || "(screenshot of a page block)" },
+            ...m.attachments.map((url) => ({ type: "image_url" as const, image_url: { url } })),
+          ] as ContentPart[])
+        : m.content,
+    })),
   ];
 
   for (let hop = 0; hop < MAX_TOOL_HOPS; hop += 1) {
@@ -449,7 +463,7 @@ export async function POST(request: Request) {
       continue;
     }
 
-    return reply(message.content ?? "");
+    return reply(typeof message.content === "string" ? message.content : "");
   }
 
   return reply("I couldn't quite finish that — try rephrasing?");

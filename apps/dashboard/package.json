@@ -25,6 +25,7 @@
     "@tael/ui": "workspace:*",
     "@trustline-agents/agent-sdk": "^0.2.1",
     "framer-motion": "^12.42.2",
+    "html-to-image": "^1.11.13",
     "lucide-react": "catalog:",
     "next": "catalog:",
     "next-themes": "catalog:",
