@@ -14,6 +14,11 @@ export interface RunAction {
   operationName: string;
   /** USDC price shown on the confirm button. */
   price: string;
+  /** For an on-chain action (pay/swap): the USDC amount being sent, so the
+   *  confirm card can say what it does (e.g. "Send $1 USDC to G…"). */
+  sendAmount?: string;
+  /** For a pay: the destination address, shown (truncated) on the confirm card. */
+  sendTo?: string;
 }
 
 /** Create a new Card (agent wallet). */

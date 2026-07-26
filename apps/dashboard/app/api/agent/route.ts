@@ -163,22 +163,25 @@ const ACTION_FEE_BPS = Number(process.env.TAEL_ACTION_FEE_BPS ?? "100");
 const ACTION_FEE_RATE =
   process.env.TAEL_FEE_ADDRESS && ACTION_FEE_BPS > 0 ? ACTION_FEE_BPS / 1e4 : 0;
 
-/** Pull a positive `amount` out of a run's params, whether the model formatted
- *  them as a query string (`to=G…&amount=1`) or JSON (`{"amount":"1"}`). */
-function amountFromParams(params: string | undefined): number | null {
+/** Read one param out of a run's params, whether the model formatted them as a
+ *  query string (`to=G…&amount=1`) or JSON (`{"to":"G…","amount":"1"}`). */
+function paramValue(params: string | undefined, key: string): string | null {
   const s = params?.trim();
   if (!s) return null;
-  let raw: string | null | undefined;
   if (s.startsWith("{")) {
     try {
-      raw = String((JSON.parse(s) as Record<string, unknown>).amount ?? "");
+      const v = (JSON.parse(s) as Record<string, unknown>)[key];
+      return v == null ? null : String(v);
     } catch {
-      raw = undefined;
+      return null;
     }
-  } else {
-    raw = new URLSearchParams(s.replace(/^\?/, "")).get("amount");
   }
-  const n = Number(raw);
+  return new URLSearchParams(s.replace(/^\?/, "")).get(key);
+}
+
+/** The positive `amount` a run sends, or null if absent/invalid. */
+function amountFromParams(params: string | undefined): number | null {
+  const n = Number(paramValue(params, "amount"));
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
@@ -285,6 +288,10 @@ async function proposeRun(
       // Show the true per-call cost on the confirm button (the amount + fee for
       // an action), not the op's free call price.
       price: sendAmount != null ? trimNum(spend) : price,
+      // For a pay/swap, tell the confirm card what it sends + where, so it can
+      // read "Send $1 USDC to G…" instead of just a bare amount.
+      ...(sendAmount != null ? { sendAmount: trimNum(sendAmount) } : {}),
+      ...(isAction && paramValue(params, "to") ? { sendTo: paramValue(params, "to")! } : {}),
     },
   };
 }
