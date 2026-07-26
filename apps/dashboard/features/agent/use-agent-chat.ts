@@ -154,5 +154,15 @@ export function useAgentChat(endpoint: string) {
     }
   }, []);
 
-  return { messages, streaming, send, runAction };
+  /** Clear the conversation and its saved copy. */
+  const clear = useCallback(() => {
+    setMessages([]);
+    try {
+      window.localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // ignore — private mode / quota
+    }
+  }, []);
+
+  return { messages, streaming, send, runAction, clear };
 }
