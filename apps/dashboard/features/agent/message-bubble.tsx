@@ -202,7 +202,7 @@ function Markdown({ text }: { text: string }) {
   flush("end");
   flushCode("end");
 
-  return <div className="space-y-2 leading-relaxed">{blocks}</div>;
+  return <div className="space-y-2 leading-relaxed [overflow-wrap:anywhere]">{blocks}</div>;
 }
 
 /** A blinking three-dot indicator shown while the first token is in flight. */
@@ -283,7 +283,7 @@ export function MessageBubble({
           {empty ? (
             <TypingDots />
           ) : isUser ? (
-            <p className="whitespace-pre-wrap">{text}</p>
+            <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{text}</p>
           ) : (
             <motion.div
               initial={{ opacity: 0 }}
