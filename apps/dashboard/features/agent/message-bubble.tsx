@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import type { AgentMessage } from "./types";
+import type { AgentMessage, ProposedAction } from "./types";
 import { DiscordIcon } from "./icons";
 
 /** A blinking three-dot indicator shown while the first token is in flight. */
@@ -44,9 +44,12 @@ const DISCORD_RE = /(?:https?:\/\/)?discord\.(?:gg|com\/invite)\/[A-Za-z0-9-]+/i
 export function MessageBubble({
   message,
   showMeta,
+  onRunAction,
 }: {
   message: AgentMessage;
   showMeta?: boolean;
+  /** Called when the user confirms a proposed capability run. */
+  onRunAction?: (messageId: string, action: ProposedAction) => void;
 }) {
   const isUser = message.role === "user";
   const empty = message.content.length === 0;
@@ -100,6 +103,28 @@ export function MessageBubble({
         >
           <DiscordIcon className="h-4 w-4" /> Join our Discord
         </a>
+      ) : null}
+
+      {message.action && !message.actionDone ? (
+        <div className="w-full max-w-[85%] rounded-2xl border border-white/10 bg-[#1c1d21] p-3">
+          <p className="text-[11px] uppercase tracking-wide text-white/40">Run capability</p>
+          <p className="mt-0.5 text-[13.5px] font-medium text-zinc-100">
+            {message.action.operationName}{" "}
+            <span className="text-white/50">· {message.action.capabilityName}</span>
+          </p>
+          <p className="mt-0.5 text-[12px] text-white/50">
+            Pays from your <span className="text-white/70">{message.action.cardName}</span> card
+          </p>
+          <button
+            type="button"
+            onClick={() => onRunAction?.(message.id, message.action!)}
+            className="mt-2.5 w-full rounded-lg bg-white px-3 py-1.5 text-[13px] font-medium text-[#14161a] transition-all duration-150 ease-out hover:bg-white/90 active:scale-[0.98]"
+          >
+            {Number(message.action.price) > 0
+              ? `Run · $${message.action.price} USDC`
+              : "Run · free"}
+          </button>
+        </div>
       ) : null}
 
       {!isUser && showMeta && !empty ? (

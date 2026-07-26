@@ -37,7 +37,7 @@ export function TaelAgent({
   const [teaser, setTeaser] = useState(false);
   const [draft, setDraft] = useState("");
   const [unread, setUnread] = useState(0);
-  const { messages, streaming, send } = useAgentChat(endpoint);
+  const { messages, streaming, send, runAction } = useAgentChat(endpoint);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const wasStreaming = useRef(false);
@@ -262,6 +262,7 @@ export function TaelAgent({
                 <MessageBubble
                   key={m.id}
                   message={m}
+                  onRunAction={runAction}
                   showMeta={
                     i === messages.length - 1 && m.role === "assistant" && m.content.length > 0
                   }

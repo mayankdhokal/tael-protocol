@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import type { AgentMessage } from "./types";
+import { runCapability } from "../agents/run-capability";
+import type { AgentMessage, ProposedAction } from "./types";
 
 let counter = 0;
 function nextId(): string {
@@ -10,8 +11,8 @@ function nextId(): string {
   return `m${counter}-${Date.now()}`;
 }
 
-/** Persist the conversation so the visitor's context survives a reload or leaving. */
-const STORAGE_KEY = "tael-agent-chat";
+/** Persist the conversation so context survives a reload or navigating away. */
+const STORAGE_KEY = "tael-copilot-chat";
 
 function loadMessages(): AgentMessage[] {
   if (typeof window === "undefined") return [];
@@ -23,21 +24,34 @@ function loadMessages(): AgentMessage[] {
   }
 }
 
+/** Trim a capability's response body for display; pretty-print if it's JSON. */
+function formatBody(body: string | undefined): string {
+  if (!body) return "";
+  let out = body;
+  try {
+    out = JSON.stringify(JSON.parse(body), null, 2);
+  } catch {
+    // not JSON — leave as-is
+  }
+  return out.length > 1200 ? `${out.slice(0, 1200)}…` : out;
+}
+
 /**
- * Owns the conversation and the streaming fetch. `send` optimistically appends
- * the user's message plus an empty assistant message, then fills that assistant
- * message token-by-token as the stream arrives, so the UI feels instant.
+ * Owns the conversation and the copilot fetch. `send` posts the history + the
+ * current page and gets back `{ reply, action }`: the reply is shown, and an
+ * action (a proposed capability run) renders as a confirm card. `runAction`
+ * executes a confirmed run through the normal server action, so the card's caps
+ * still bound the spend, and appends the result.
  */
 export function useAgentChat(endpoint: string) {
   const [messages, setMessages] = useState<AgentMessage[]>(loadMessages);
   const [streaming, setStreaming] = useState(false);
-  // The route the user is currently on, so the assistant can answer about the
-  // page they're looking at and scope its tools to their session.
+  // The route the user is on, so the copilot can answer about the current page
+  // and scope its tools to their session.
   const pathname = usePathname();
-  // Guards against overlapping sends (double-enter, clicking a suggestion mid-stream).
+  // Guards against overlapping sends (double-enter, clicking a suggestion mid-run).
   const busy = useRef(false);
 
-  // Save the conversation on every change (survives reload / the visitor leaving).
   useEffect(() => {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
@@ -71,28 +85,20 @@ export function useAgentChat(endpoint: string) {
             pageContext: { path: pathname },
           }),
         });
+        const data = (await res.json().catch(() => null)) as {
+          reply?: string;
+          action?: ProposedAction | null;
+          error?: string;
+        } | null;
+        if (!res.ok || !data) throw new Error(data?.error ?? "request failed");
 
-        if (!res.ok || !res.body) {
-          const detail = await res
-            .json()
-            .then((j: { error?: string }) => j.error)
-            .catch(() => null);
-          throw new Error(detail ?? "request failed");
-        }
-
-        // Buffer the whole reply as it streams in, but don't paint it token by
-        // token. The visitor sees the typing indicator while it generates, then
-        // the complete message is revealed at once (with a fade, in the bubble).
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let acc = "";
-        for (;;) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          acc += decoder.decode(value, { stream: true });
-        }
-        acc += decoder.decode();
-        setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: acc } : m)));
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? { ...m, content: data.reply ?? "", action: data.action ?? undefined }
+              : m,
+          ),
+        );
       } catch (error) {
         const message =
           error instanceof Error && error.message !== "request failed"
@@ -109,5 +115,44 @@ export function useAgentChat(endpoint: string) {
     [endpoint, messages, pathname],
   );
 
-  return { messages, streaming, send };
+  /** Run a proposed capability the user just confirmed, then append the result. */
+  const runAction = useCallback(async (messageId: string, action: ProposedAction) => {
+    if (busy.current) return;
+    busy.current = true;
+    setStreaming(true);
+    // Collapse the confirm card on the proposing message.
+    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, actionDone: true } : m)));
+    const resultId = nextId();
+    setMessages((prev) => [
+      ...prev,
+      { id: resultId, role: "assistant", content: "Running…", createdAt: Date.now() },
+    ]);
+
+    const isGet = (action.method ?? "GET").toUpperCase() === "GET";
+    try {
+      const r = await runCapability({
+        agentId: action.cardId,
+        slug: action.slug,
+        operation: action.operation,
+        method: action.method,
+        body: isGet ? undefined : action.params,
+        query: isGet ? action.params : undefined,
+      });
+      const text = r.ok
+        ? `Ran ${action.operationName}${Number(r.paid) > 0 ? ` · paid $${r.paid} USDC` : " · free"}.` +
+          (r.borrowed ? ` Borrowed $${r.borrowed} from TrustLine.` : "") +
+          `\n\n${formatBody(r.body)}`
+        : `Couldn't run it: ${r.error ?? "something went wrong"}`;
+      setMessages((prev) => prev.map((m) => (m.id === resultId ? { ...m, content: text } : m)));
+    } catch {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === resultId ? { ...m, content: "Sorry, that didn't run." } : m)),
+      );
+    } finally {
+      busy.current = false;
+      setStreaming(false);
+    }
+  }, []);
+
+  return { messages, streaming, send, runAction };
 }
