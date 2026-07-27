@@ -18,35 +18,54 @@ function ActionCard({ action, onRun }: { action: ProposedAction; onRun: () => vo
   let button: string;
   if (action.kind === "run") {
     // A pay/swap carries a send amount (and a pay, a destination): show what it
-    // does, e.g. "Sends $1 USDC to GC62…LBRK", not just the op name.
+    // does, e.g. "Sends $1 USDC to GC62…LBRK", not just the op name. A delay means
+    // it's scheduled for later.
     const sending = action.sendAmount != null;
-    label = sending ? "Send payment" : "Run capability";
+    const scheduled = !!action.delaySeconds && action.delaySeconds > 0;
+    const whenText = scheduled
+      ? action.delaySeconds! >= 60
+        ? `in ~${Math.round(action.delaySeconds! / 60)} min`
+        : `in ${action.delaySeconds}s`
+      : "";
+    label = scheduled ? "Schedule payment" : sending ? "Send payment" : "Run capability";
     title = (
       <>
         {action.operationName} <span className="text-white/50">· {action.capabilityName}</span>
       </>
     );
-    sub = sending ? (
+    sub = (
       <>
-        Sends <span className="text-white/70">${action.sendAmount} USDC</span>
-        {action.sendTo ? (
+        {sending ? (
+          <>
+            Sends <span className="text-white/70">${action.sendAmount} USDC</span>
+            {action.sendTo ? (
+              <>
+                {" "}
+                to <span className="text-white/70">{shortAddr(action.sendTo)}</span>
+              </>
+            ) : null}{" "}
+            · from your <span className="text-white/70">{action.cardName}</span> card
+          </>
+        ) : (
+          <>
+            Pays from your <span className="text-white/70">{action.cardName}</span> card
+          </>
+        )}
+        {scheduled ? (
           <>
             {" "}
-            to <span className="text-white/70">{shortAddr(action.sendTo)}</span>
+            · <span className="text-white/70">{whenText}</span>
           </>
-        ) : null}{" "}
-        · from your <span className="text-white/70">{action.cardName}</span> card
-      </>
-    ) : (
-      <>
-        Pays from your <span className="text-white/70">{action.cardName}</span> card
+        ) : null}
       </>
     );
-    button = sending
-      ? `Send · $${action.sendAmount} USDC`
-      : Number(action.price) > 0
-        ? `Run · $${action.price} USDC`
-        : "Run · free";
+    button = scheduled
+      ? `Schedule · $${action.sendAmount ?? action.price} USDC`
+      : sending
+        ? `Send · $${action.sendAmount} USDC`
+        : Number(action.price) > 0
+          ? `Run · $${action.price} USDC`
+          : "Run · free";
   } else if (action.kind === "create_card") {
     label = "Create card";
     title = action.name;

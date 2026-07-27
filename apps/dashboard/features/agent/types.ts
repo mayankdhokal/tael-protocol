@@ -19,6 +19,9 @@ export interface RunAction {
   sendAmount?: string;
   /** For a pay: the destination address, shown (truncated) on the confirm card. */
   sendTo?: string;
+  /** Schedule the run this many seconds from confirmation instead of running it
+   *  now (client-side, capped at 5 min; only while the tab stays open). */
+  delaySeconds?: number;
 }
 
 /** Create a new Card (agent wallet). */
