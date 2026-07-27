@@ -1,13 +1,15 @@
 const COLUMNS = [
-  { title: "Product", links: ["Apps", "Guide", "FAQs"] },
+  { title: "Product", links: ["Capabilities", "Guide", "Whitepaper", "Request a capability"] },
   { title: "Try Tael", links: ["Mainnet", "Testnet"] },
 ];
 
 // Real destinations for links that have one; others fall back to "#".
 const HREFS: Record<string, string> = {
-  Apps: "/capabilities",
+  Capabilities: "/capabilities",
   Guide: "/guide",
-  FAQs: "/coming-soon",
+  Whitepaper: "/whitepaper",
+  "Request a capability":
+    "https://github.com/tael-protocol/tael/issues/new?labels=good-first-capability&title=good-first-capability%3A%20",
   Mainnet: "https://mainnet.taelprotocol.xyz",
   Testnet: "https://app.taelprotocol.xyz",
 };
