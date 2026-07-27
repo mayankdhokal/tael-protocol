@@ -93,7 +93,7 @@ export default function GuidePage() {
           Connect your best capabilities, put a price on them, and get an autonomous agent that runs
           your product for your users. One API, live in minutes.
         </p>
-        <div className="mt-8 flex items-center justify-center gap-3">
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <a href={MAINNET_URL} target="_blank" rel="noopener noreferrer" className={primaryCta}>
             Try on Mainnet
             <ArrowIcon />
@@ -229,7 +229,7 @@ export default function GuidePage() {
               </span>
             ))}
           </div>
-          <div className="mt-10 flex items-center gap-3">
+          <div className="mt-10 flex flex-wrap items-center gap-3">
             <a href={MAINNET_URL} target="_blank" rel="noopener noreferrer" className={primaryCta}>
               Try on Mainnet
               <ArrowIcon />

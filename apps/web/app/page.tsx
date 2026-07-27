@@ -100,7 +100,7 @@ export default function HomePage() {
           </div>
 
           {/* CTAs — the product is live, so link straight into it. */}
-          <div className="absolute left-1/2 top-[481px] flex max-w-[calc(100vw-48px)] -translate-x-1/2 items-center gap-3">
+          <div className="absolute left-1/2 top-[481px] flex max-w-[calc(100vw-48px)] -translate-x-1/2 flex-wrap items-center justify-center gap-3">
             <a
               href="https://mainnet.taelprotocol.xyz"
               target="_blank"
