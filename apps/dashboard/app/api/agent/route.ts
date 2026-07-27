@@ -64,7 +64,13 @@ const TOOLS = [
         description:
           "The op's parameters, formatted exactly like its `sample` field. For action ops (e.g. Stellar 'pay' or 'swap') this is required — pass every key the sample shows, e.g. `to=G…&amount=1.5`. Ask the user for any value you don't have (like the destination address or amount) before proposing the run.",
       },
+      delaySeconds: {
+        type: "string",
+        description:
+          "Optional. To SCHEDULE the run for later (e.g. 'pay ... in 2 minutes'), the number of seconds to wait before it runs. Max 300 (5 minutes). Omit to run now.",
+      },
     },
+    ["slug", "operation"],
   ),
   fn(
     "create_card",
@@ -81,7 +87,12 @@ const TOOLS = [
   ),
 ];
 
-function fn(name: string, description: string, properties?: Record<string, unknown>) {
+function fn(
+  name: string,
+  description: string,
+  properties?: Record<string, unknown>,
+  required?: string[],
+) {
   return {
     type: "function" as const,
     function: {
@@ -90,7 +101,7 @@ function fn(name: string, description: string, properties?: Record<string, unkno
       parameters: {
         type: "object",
         properties: properties ?? {},
-        required: properties ? Object.keys(properties) : [],
+        required: required ?? (properties ? Object.keys(properties) : []),
       },
     },
   };
@@ -218,6 +229,17 @@ async function proposeRun(
     ) ?? ops[0];
   if (!op) return { reply: `${cap.name} has no runnable operations.`, action: null };
 
+  // Optional schedule: run this many seconds from confirmation (client-side, so
+  // capped at 5 minutes and only while the tab stays open).
+  const delaySeconds = Math.max(0, Math.round(Number(args.delaySeconds ?? 0)) || 0);
+  if (delaySeconds > 300) {
+    return {
+      reply:
+        "I can only schedule a payment up to 5 minutes out for now (it runs while this tab stays open). Want it within 5 minutes, or should I send it now?",
+      action: null,
+    };
+  }
+
   const price = op.price ?? "0";
   // On-chain ACTION ops (Stellar pay/swap) move the amount the user names plus
   // Tael's fee — not the op's (free) call price. Detect them by their
@@ -276,8 +298,15 @@ async function proposeRun(
       : Number(price) > 0
         ? `pays **$${price} USDC** from your "${card.name}" card`
         : "is free";
+  const when =
+    delaySeconds > 0
+      ? ` in ~${delaySeconds >= 60 ? `${Math.round(delaySeconds / 60)} min` : `${delaySeconds}s`}`
+      : "";
   return {
-    reply: `I can run **${op.name}** on ${cap.name} — it ${cost}. Confirm below to run it.`,
+    reply:
+      delaySeconds > 0
+        ? `I'll schedule **${op.name}** on ${cap.name}${when} — it ${cost}. Confirm below to schedule it.`
+        : `I can run **${op.name}** on ${cap.name} — it ${cost}. Confirm below to run it.`,
     action: {
       kind: "run",
       slug,
@@ -295,6 +324,7 @@ async function proposeRun(
       // read "Send $1 USDC to G…" instead of just a bare amount.
       ...(sendAmount != null ? { sendAmount: trimNum(sendAmount) } : {}),
       ...(isAction && paramValue(params, "to") ? { sendTo: paramValue(params, "to")! } : {}),
+      ...(delaySeconds > 0 ? { delaySeconds } : {}),
     },
   };
 }
@@ -367,7 +397,7 @@ interface AgentRequestBody {
 export async function POST(request: Request) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey)
-    return jsonError("The copilot isn't configured yet (missing OPENROUTER_API_KEY).", 503);
+    return jsonError("The agent isn't configured yet (missing OPENROUTER_API_KEY).", 503);
 
   const body = (await request.json().catch(() => null)) as AgentRequestBody | null;
   const messages = body?.messages;
@@ -407,7 +437,7 @@ export async function POST(request: Request) {
           authorization: `Bearer ${apiKey}`,
           "content-type": "application/json",
           "HTTP-Referer": "https://taelprotocol.xyz",
-          "X-Title": "Tael Copilot",
+          "X-Title": "Tael Agent",
         },
         body: JSON.stringify({
           model: MODEL,
@@ -424,7 +454,7 @@ export async function POST(request: Request) {
           resp.status,
           await resp.text().catch(() => ""),
         );
-        return reply("Sorry, the copilot is unavailable right now. Please try again.");
+        return reply("Sorry, the agent is unavailable right now. Please try again.");
       }
       data = (await resp.json()) as OpenRouterResponse;
     } catch (error) {

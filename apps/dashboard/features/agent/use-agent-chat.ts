@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { createAgent } from "../agents/actions";
 import { createApiKey } from "../api-keys/actions";
 import { runCapability } from "../agents/run-capability";
-import type { AgentMessage, ProposedAction } from "./types";
+import type { AgentMessage, ProposedAction, RunAction } from "./types";
 
 let counter = 0;
 function nextId(): string {
@@ -77,6 +77,42 @@ function formatBody(body: string | undefined): string {
     // not JSON — leave as-is
   }
   return out.length > 1200 ? `${out.slice(0, 1200)}…` : out;
+}
+
+/** Truncate a Stellar address for a compact display, e.g. GC62IX…LBRK. */
+function shortAddr(a: string): string {
+  return a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a;
+}
+
+/** A human countdown like "2m 5s" / "45s". */
+function fmtCountdown(s: number): string {
+  if (s >= 60) {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return sec ? `${m}m ${sec}s` : `${m}m`;
+  }
+  return `${s}s`;
+}
+
+/** Execute one confirmed run and return the result text (with an on-chain proof
+ *  link when it settled). Shared by immediate and scheduled runs. */
+async function runOne(action: RunAction): Promise<string> {
+  const isGet = (action.method ?? "GET").toUpperCase() === "GET";
+  const params = paramsForMethod(action.params, isGet);
+  const r = await runCapability({
+    agentId: action.cardId,
+    slug: action.slug,
+    operation: action.operation,
+    method: action.method,
+    body: isGet ? undefined : params,
+    query: isGet ? params : undefined,
+  });
+  return r.ok
+    ? `**Ran ${action.operationName}**${Number(r.paid) > 0 ? ` · paid $${r.paid} USDC` : " · free"}` +
+        (r.borrowed ? ` · borrowed $${r.borrowed} from TrustLine` : "") +
+        (r.txHash ? `\n\n[View on-chain proof ↗](${STELLAR_EXPERT_TX}${r.txHash})` : "") +
+        (r.body ? `\n\n\`\`\`json\n${formatBody(r.body)}\n\`\`\`` : "")
+    : `Couldn't run it: ${r.error ?? "something went wrong"}`;
 }
 
 /**
@@ -175,10 +211,50 @@ export function useAgentChat(endpoint: string) {
    *  Card, or create an API key), then append the result. */
   const runAction = useCallback(async (messageId: string, action: ProposedAction) => {
     if (busy.current) return;
-    busy.current = true;
-    setStreaming(true);
     // Collapse the confirm card on the proposing message.
     setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, actionDone: true } : m)));
+
+    // Scheduled run: don't block the agent — show a live countdown and fire the
+    // run when it elapses. Client-side, so it only runs while the tab stays open.
+    if (action.kind === "run" && action.delaySeconds && action.delaySeconds > 0) {
+      const delayMs = Math.min(action.delaySeconds, 300) * 1000;
+      const fireAt = Date.now() + delayMs;
+      const id = nextId();
+      const what = action.sendAmount
+        ? `pay **$${action.sendAmount} USDC**${action.sendTo ? ` to ${shortAddr(action.sendTo)}` : ""}`
+        : `run **${action.operationName}**`;
+      const line = (s: number) =>
+        `**Scheduled** ⏱ — I'll ${what} in ${fmtCountdown(s)}. Keep this tab open.`;
+      setMessages((prev) => [
+        ...prev,
+        { id, role: "assistant", content: line(Math.ceil(delayMs / 1000)), createdAt: Date.now() },
+      ]);
+      const set = (content: string) =>
+        setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, content } : m)));
+      const tick = setInterval(() => {
+        const s = Math.ceil((fireAt - Date.now()) / 1000);
+        if (s > 0) set(line(s));
+      }, 1000);
+      setTimeout(() => {
+        clearInterval(tick);
+        // If the user cleared the chat, the scheduled message is gone — cancel,
+        // so we never move money for something no longer on screen.
+        let live = false;
+        setMessages((prev) => {
+          live = prev.some((m) => m.id === id);
+          return live
+            ? prev.map((m) =>
+                m.id === id ? { ...m, content: "Running the scheduled payment…" } : m,
+              )
+            : prev;
+        });
+        if (live) void runOne(action).then(set);
+      }, delayMs);
+      return;
+    }
+
+    busy.current = true;
+    setStreaming(true);
     const resultId = nextId();
     const working =
       action.kind === "run"
@@ -196,24 +272,7 @@ export function useAgentChat(endpoint: string) {
 
     try {
       if (action.kind === "run") {
-        const isGet = (action.method ?? "GET").toUpperCase() === "GET";
-        const params = paramsForMethod(action.params, isGet);
-        const r = await runCapability({
-          agentId: action.cardId,
-          slug: action.slug,
-          operation: action.operation,
-          method: action.method,
-          body: isGet ? undefined : params,
-          query: isGet ? params : undefined,
-        });
-        patch({
-          content: r.ok
-            ? `**Ran ${action.operationName}**${Number(r.paid) > 0 ? ` · paid $${r.paid} USDC` : " · free"}` +
-              (r.borrowed ? ` · borrowed $${r.borrowed} from TrustLine` : "") +
-              (r.txHash ? `\n\n[View on-chain proof ↗](${STELLAR_EXPERT_TX}${r.txHash})` : "") +
-              (r.body ? `\n\n\`\`\`json\n${formatBody(r.body)}\n\`\`\`` : "")
-            : `Couldn't run it: ${r.error ?? "something went wrong"}`,
-        });
+        patch({ content: await runOne(action) });
       } else if (action.kind === "create_card") {
         const r = await createAgent({
           name: action.name,

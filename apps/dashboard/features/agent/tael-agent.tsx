@@ -270,7 +270,7 @@ export function TaelAgent({
                 </button>
               </div>
               <p className="mt-2 text-center text-[10.5px] text-white/30">
-                Tael assistant can make mistakes. Verify important details.
+                The Tael agent can make mistakes. Verify important details.
               </p>
             </form>
           </motion.div>
