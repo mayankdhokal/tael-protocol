@@ -23,8 +23,8 @@ export const INTRO_MESSAGE = `${GREETING}\n${INTRO_BODY}`;
 /** One-tap prompts shown under the intro to get people started. */
 export const SUGGESTED_QUESTIONS = [
   "What is Tael?",
-  "How do I publish a capability?",
-  "How do agents pay for a call?",
+  "How can I publish my capabilities?",
+  "How do I make a card or API key to access capabilities?",
   "Book a meeting",
 ];
 

@@ -1,8 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
 import { SiteHeader } from "./_components/site-header";
-import { WaitlistForm } from "./_components/waitlist-form";
 import { ProviderCards } from "./_components/provider-cards";
 import { FooterLinks } from "./_components/footer-links";
+import { TaelAgent } from "./_components/agent";
 
 // Pixel-anchored: dark upper region matches the original design, then a long,
 // smooth grey→white fade (410→740px, ~330px) so it blends gently into white
@@ -95,13 +95,35 @@ export default function HomePage() {
               For AI agents.
             </h1>
             <p className="max-w-[430px] text-[18px] font-normal leading-[26px] tracking-[-0.035em] text-white">
-              Pay for every API you use. 100 apps and 3000 actions, all in one platform.
+              Pay per call for any API, tool, or model. In USDC, no subscriptions, no accounts.
             </p>
           </div>
 
-          {/* Waitlist */}
-          <div className="absolute left-1/2 top-[481px] w-[464px] max-w-[calc(100vw-48px)] -translate-x-1/2">
-            <WaitlistForm className="w-full" />
+          {/* CTAs — the product is live, so link straight into it. */}
+          <div className="absolute left-1/2 top-[481px] flex max-w-[calc(100vw-48px)] -translate-x-1/2 items-center gap-3">
+            <a
+              href="https://mainnet.taelprotocol.xyz"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-[14px] bg-accent px-6 py-3.5 text-[15px] font-medium text-white shadow-[0_1px_2px_0_rgba(0,0,0,0.16)] transition-opacity hover:opacity-90"
+            >
+              Try on Mainnet
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path
+                  d="M5 12h14M13 6l6 6-6 6"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </a>
+            <a
+              href="/docs"
+              className="inline-flex items-center rounded-[14px] border border-white/25 px-6 py-3.5 text-[15px] font-medium text-white transition-colors hover:bg-white/10"
+            >
+              Read the docs
+            </a>
           </div>
         </div>
       </section>
@@ -113,6 +135,11 @@ export default function HomePage() {
           <ProviderCards />
         </div>
       </section>
+
+      {/* Support agent — landing page only, and desktop only (hidden on phones). */}
+      <div className="hidden md:block">
+        <TaelAgent />
+      </div>
     </>
   );
 }
