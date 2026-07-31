@@ -1,4 +1,4 @@
-import { index, numeric, pgTable, text, uuid } from "drizzle-orm/pg-core";
+import { index, numeric, pgTable, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { paymentStatus, primaryId, timestamps } from "./_shared";
 import { capabilities } from "./capabilities";
 import { agents } from "./agents";
@@ -14,13 +14,17 @@ export const payments = pgTable(
   {
     id: primaryId(),
     capabilityId: uuid("capability_id").references(() => capabilities.id, { onDelete: "set null" }),
+    /** Capability name at settlement time, kept so history survives its deletion. */
+    capabilityName: text("capability_name"),
     agentId: uuid("agent_id").references(() => agents.id, { onDelete: "set null" }),
 
     /** Payer + payee Stellar addresses (denormalized so history is self-contained). */
     payer: text("payer").notNull(),
     payee: text("payee").notNull(),
-    /** Amount in USDC, decimal string. */
+    /** Amount the payee (builder) receives, in USDC. */
     amount: numeric("amount", { precision: 20, scale: 7 }).notNull(),
+    /** Marketplace fee taken by Tael in the same transaction, in USDC. */
+    fee: numeric("fee", { precision: 20, scale: 7 }).notNull().default("0"),
 
     status: paymentStatus("status").notNull().default("pending"),
     /** Stellar transaction hash once settled; null while pending. */
@@ -33,6 +37,9 @@ export const payments = pgTable(
     index("payments_payer_idx").on(table.payer),
     index("payments_payee_idx").on(table.payee),
     index("payments_status_idx").on(table.status),
+    // Replay/double-count protection: a settled tx can be recorded at most once.
+    // Nulls are distinct in Postgres, so pending rows (txHash = null) are unaffected.
+    uniqueIndex("payments_tx_hash_unique").on(table.txHash),
   ],
 );
 

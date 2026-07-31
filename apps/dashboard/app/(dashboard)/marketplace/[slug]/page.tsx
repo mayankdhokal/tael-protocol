@@ -1,12 +1,32 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, BadgeCheck, ChevronDown, Code2 } from "lucide-react";
-import { Button, cn } from "@tael/ui";
+import { ArrowLeft, BadgeCheck, Check, ChevronDown, Pencil } from "lucide-react";
+import { cn } from "@tael/ui";
 import { getPublicCapabilityBySlug } from "../../../../features/capabilities/queries";
+import { isCurrentUserAdmin } from "../../../../features/capabilities/actions";
+import { CapabilityLogo } from "../../../../features/capabilities/capability-logo";
 import { formatPrice, kindMeta, timeAgo } from "../../../../features/capabilities/kind-meta";
+import { UseCapabilityDialog } from "../../../../features/capabilities/use-capability-dialog";
+import { VerifyToggle } from "../../../../features/capabilities/verify-toggle";
+import { OperationsExplorer } from "../../../../features/agents/operations-explorer";
+import { listAgentsForRun } from "../../../../features/agents/queries";
+import { ReviewsSection } from "../../../../features/reviews/reviews-section";
 import { VerificationTimeline } from "../../../../features/capabilities/verification-timeline";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
 export const dynamic = "force-dynamic";
+
+/** URL-safe operation handle for `/c/<slug>/<op>` (mirrors the publish action). */
+function opSlug(name: string | undefined, i: number): string {
+  const base = (name ?? "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  return base || `op-${i + 1}`;
+}
 
 export default async function CapabilityDetailPage({
   params,
@@ -17,10 +37,20 @@ export default async function CapabilityDetailPage({
   const capability = await getPublicCapabilityBySlug(slug);
   if (!capability) notFound();
 
+  const agentOptions = await listAgentsForRun();
   const verified = capability.status === "verified";
+  const isAdmin = await isCurrentUserAdmin();
   const meta = kindMeta(capability.kind);
   const Icon = meta.icon;
   const operations = capability.spec.operations ?? [];
+  const contact = capability.contact;
+  const contactHref = contact
+    ? contact.startsWith("http")
+      ? contact
+      : /\S+@\S+\.\S+/.test(contact)
+        ? `mailto:${contact}`
+        : null
+    : null;
 
   return (
     <div className="space-y-8">
@@ -32,23 +62,36 @@ export default async function CapabilityDetailPage({
       </Link>
 
       {/* Header */}
-      <div className="flex items-start gap-4">
-        <div
-          className={cn(
-            "flex h-14 w-14 shrink-0 items-center justify-center rounded-xl",
-            meta.tile,
-          )}
-        >
-          <Icon className="h-6 w-6" />
-        </div>
+      <div className="flex items-center gap-4">
+        <CapabilityLogo
+          src={capability.logoUrl}
+          name={capability.name}
+          kind={capability.kind}
+          className="h-14 w-14 rounded-xl"
+          iconClassName="h-6 w-6"
+        />
         <div className="min-w-0 flex-1 space-y-1">
-          <p className="text-sm text-muted-foreground">Capability</p>
           <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
             {capability.name}
-            {verified ? <BadgeCheck className="h-5 w-5 text-emerald-600" /> : null}
+            {verified ? (
+              <span
+                title="Verified by Tael"
+                className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm"
+              >
+                <Check className="h-3 w-3" strokeWidth={3.5} />
+              </span>
+            ) : null}
           </h1>
         </div>
-        <Button>Use capability</Button>
+        <div className="flex items-center gap-2">
+          {isAdmin ? (
+            <VerifyToggle id={capability.id} verified={verified} variant="compact" />
+          ) : null}
+          <UseCapabilityDialog
+            endpoint={`${API_URL}/c/${capability.slug}`}
+            price={`$${formatPrice(capability.price)}`}
+          />
+        </div>
       </div>
 
       {/* Meta row */}
@@ -59,8 +102,8 @@ export default async function CapabilityDetailPage({
               <BadgeCheck className="h-4 w-4" /> Verified
             </span>
           ) : (
-            <span className="inline-flex rounded-full bg-muted px-2.5 py-1 text-sm text-muted-foreground">
-              Draft
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-1 text-sm font-medium text-amber-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Pending review
             </span>
           )}
         </Meta>
@@ -84,12 +127,47 @@ export default async function CapabilityDetailPage({
         </Meta>
       </div>
 
+      {isAdmin ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed px-3 py-2">
+          <span className="text-xs text-muted-foreground">
+            Admin — set this capability&apos;s status from the header.
+          </span>
+          <Link
+            href={`/capabilities/${capability.id}/edit`}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+          >
+            <Pencil className="h-4 w-4" /> Edit
+          </Link>
+        </div>
+      ) : null}
+
+      {contact ? (
+        <p className="text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">Support</span>{" "}
+          {contactHref ? (
+            <a
+              href={contactHref}
+              target="_blank"
+              rel="noreferrer"
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              {contact}
+            </a>
+          ) : (
+            <span>{contact}</span>
+          )}
+        </p>
+      ) : null}
+
       {/* Verification journey */}
       <section className="space-y-3">
         <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
           Verification
         </h2>
-        <VerificationTimeline verified={verified} />
+        <VerificationTimeline
+          status={capability.status}
+          publishedLabel={timeAgo(capability.createdAt.toISOString())}
+        />
       </section>
 
       {/* Description */}
@@ -102,44 +180,24 @@ export default async function CapabilityDetailPage({
         </section>
       ) : null}
 
-      {/* Requests — each operation with its price + sample request/response */}
+      {/* Operations — expandable table: edit params, run inline, see the result. */}
       {operations.length > 0 ? (
-        <section className="space-y-3">
-          <h2 className="flex items-center gap-1.5 text-sm font-medium uppercase tracking-wide text-muted-foreground">
-            <Code2 className="h-4 w-4" /> Requests
-          </h2>
-          <div className="space-y-4">
-            {operations.map((op, i) => (
-              <div key={i} className="space-y-3 rounded-xl border p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  {op.method ? (
-                    <span className="rounded-md border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 font-mono text-xs font-semibold text-blue-600">
-                      {op.method}
-                    </span>
-                  ) : null}
-                  <span className="font-medium">{op.name || `Request ${i + 1}`}</span>
-                  <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
-                    /{capability.slug}
-                  </code>
-                  <span className="ml-auto text-sm font-semibold">
-                    ${formatPrice(op.price)}
-                    <span className="text-xs font-normal text-muted-foreground">USDC/call</span>
-                  </span>
-                </div>
-                {op.sampleRequest || op.sampleResponse ? (
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {op.sampleRequest ? (
-                      <CodeBlock title="Sample request" code={op.sampleRequest} />
-                    ) : null}
-                    {op.sampleResponse ? (
-                      <CodeBlock title="Sample response" code={op.sampleResponse} />
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        </section>
+        <OperationsExplorer
+          slug={capability.slug}
+          agents={agentOptions}
+          operations={operations.map((op, i) => ({
+            name: op.name || `Request ${i + 1}`,
+            opSlug: op.slug || opSlug(op.name, i),
+            method: op.method || "GET",
+            price: formatPrice(op.price),
+            priceRaw: op.price ?? "0",
+            sampleRequest: op.sampleRequest ?? "",
+            sampleResponse: op.sampleResponse ?? "",
+            // Action ops return a `tael_action` intent to sign, not data — mark
+            // them so they read as "Action", never "Free".
+            isAction: (op.sampleResponse ?? "").includes("tael_action"),
+          }))}
+        />
       ) : null}
 
       {/* FAQ — visible to buyers, collapsed by default */}
@@ -161,19 +219,9 @@ export default async function CapabilityDetailPage({
           </div>
         </section>
       ) : null}
-    </div>
-  );
-}
 
-function CodeBlock({ title, code }: { title: string; code: string }) {
-  return (
-    <div className="overflow-hidden rounded-xl border">
-      <div className="border-b bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground">
-        {title}
-      </div>
-      <pre className="overflow-x-auto p-3 text-xs leading-relaxed">
-        <code>{code}</code>
-      </pre>
+      {/* Reviews */}
+      <ReviewsSection capabilityId={capability.id} slug={capability.slug} />
     </div>
   );
 }

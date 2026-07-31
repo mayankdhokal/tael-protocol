@@ -23,12 +23,14 @@
     "@tael/stellar": "workspace:*",
     "@tael/types": "workspace:*",
     "@tael/ui": "workspace:*",
+    "@trustline-agents/agent-sdk": "^0.2.0",
     "lucide-react": "catalog:",
     "next": "catalog:",
     "next-themes": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "server-only": "^0.0.1",
+    "sonner": "^1.7.4",
     "zod": "catalog:"
   },
   "devDependencies": {

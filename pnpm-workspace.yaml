@@ -5,6 +5,7 @@ packages:
   - "packages/*"
 
 allowBuilds:
+  "@heroui/shared-utils": false
   "@reown/appkit": false
   blake-hash: false
   bufferutil: false
@@ -95,6 +96,8 @@ catalog:
   next-themes: ^0.4.4
   "@radix-ui/react-slot": ^1.1.1
   "@radix-ui/react-dialog": ^1.1.4
+  "@radix-ui/react-dropdown-menu": ^2.1.6
+  "@radix-ui/react-tooltip": ^1.1.6
 
   # --- Types ---
   "@types/node": ^22.13.10

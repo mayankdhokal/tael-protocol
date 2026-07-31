@@ -6,3 +6,8 @@ export * from "./config";
 export * from "./usdc";
 export * from "./settlement";
 export * from "./verify";
+export * from "./payment-verify";
+export * from "./keypair";
+export * from "./provision";
+export * from "./pay";
+export * from "./swap";

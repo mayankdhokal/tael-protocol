@@ -1,19 +1,45 @@
 "use server";
 
-import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import {
   and,
   capabilities,
   encryptSecret,
   eq,
+  ilike,
   type CapabilityFaq,
   type CapabilitySpec,
+  type UpstreamAuth,
 } from "@tael/database";
 import { generateFaqQuestions } from "@tael/claude";
 import { db } from "../../lib/db";
 import { getCurrentUser } from "./current-user";
-import { minPrice, publishCapabilitySchema, slugify } from "./schema";
+import {
+  describeCapabilitySchema,
+  minPrice,
+  parseHeaderLines,
+  publishCapabilitySchema,
+  slugify,
+  type PublishCapabilityInput,
+} from "./schema";
+
+/** Build the stored UpstreamAuth from the publisher's choices, or null for the
+ *  plain Bearer default (keeps existing behavior + a compact row). */
+function buildUpstreamAuth(input: {
+  authScheme: "bearer" | "header" | "none";
+  authHeader: string;
+  authExtraHeaders: string;
+}): UpstreamAuth | null {
+  const extra = parseHeaderLines(input.authExtraHeaders);
+  const hasExtra = Object.keys(extra).length > 0;
+  // Plain bearer with no static headers = the default → store null.
+  if (input.authScheme === "bearer" && !hasExtra) return null;
+  return {
+    scheme: input.authScheme,
+    header: input.authScheme === "header" ? input.authHeader || undefined : undefined,
+    extraHeaders: hasExtra ? extra : undefined,
+  };
+}
 
 /** Live result of calling a capability's endpoint during verification. */
 export interface TestResult {
@@ -40,6 +66,9 @@ export async function testRequest(input: {
   method: string;
   body: string;
   secret: string;
+  authScheme?: "bearer" | "header" | "none";
+  authHeader?: string;
+  authExtraHeaders?: string;
 }): Promise<{ ok: boolean; result?: TestResult; error?: string }> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Not signed in." };
@@ -49,6 +78,9 @@ export async function testRequest(input: {
     method: input.method || "POST",
     body: input.body,
     secret: input.secret,
+    authScheme: input.authScheme ?? "bearer",
+    authHeader: input.authHeader ?? "",
+    authExtraHeaders: input.authExtraHeaders ?? "",
   });
   return { ok: true, result };
 }
@@ -68,6 +100,24 @@ export async function generateQuestions(input: {
   if (!user) return { ok: false, error: "Not signed in." };
   const questions = await generateFaqQuestions({ ...input, userAddress: user.walletAddress });
   return { ok: true, questions };
+}
+
+/**
+ * Turn a base slug into a unique one, keeping the clean name the publisher chose.
+ * Returns `cat-facts` when free; only falls back to `cat-facts-2`, `-3`, … when
+ * the name is already taken. Keeps public URLs human — no random suffix.
+ */
+async function uniqueSlug(base: string): Promise<string> {
+  const rows = await db
+    .select({ slug: capabilities.slug })
+    .from(capabilities)
+    .where(ilike(capabilities.slug, `${base}%`));
+  const taken = new Set(rows.map((r) => r.slug));
+  if (!taken.has(base)) return base;
+  for (let i = 2; ; i += 1) {
+    const candidate = `${base}-${i}`;
+    if (!taken.has(candidate)) return candidate;
+  }
 }
 
 /**
@@ -91,31 +141,47 @@ export async function publishCapability(
   const input = parsed.data;
 
   const faqs: CapabilityFaq[] = input.faqs.filter((f) => f.answer.trim().length > 0);
+  // Give each operation a URL-safe slug (from its name) so buyers can address it
+  // at /c/<slug>/<operation>; dedupe collisions with a numeric suffix.
+  const opSlugs = new Set<string>();
   const spec: CapabilitySpec = {
-    operations: input.operations.map((op) => ({
-      name: op.name || "Request",
-      method: op.method || undefined,
-      sampleRequest: op.sampleRequest || undefined,
-      sampleResponse: op.sampleResponse || undefined,
-      price: op.price,
-    })),
+    operations: input.operations.map((op, i) => {
+      const base = slugify(op.name || `op-${i + 1}`) || `op-${i + 1}`;
+      let opSlug = base;
+      for (let n = 2; opSlugs.has(opSlug); n += 1) opSlug = `${base}-${n}`;
+      opSlugs.add(opSlug);
+      return {
+        name: op.name || "Request",
+        slug: opSlug,
+        path: op.path || undefined,
+        method: op.method || undefined,
+        sampleRequest: op.sampleRequest || undefined,
+        sampleResponse: op.sampleResponse || undefined,
+        price: op.price,
+      };
+    }),
   };
-  const slug = `${slugify(input.name)}-${randomBytes(3).toString("hex")}`;
+  const slug = await uniqueSlug(slugify(input.name));
 
   try {
     await db.insert(capabilities).values({
       slug,
       name: input.name,
       description: input.description,
+      logoUrl: input.logoUrl || null,
+      contact: input.contact || null,
       kind: input.kind,
       visibility: input.visibility,
-      status: "verified",
+      // Published capabilities are usable + listed immediately, but start
+      // `pending` — Tael grants `verified` (the trust badge) after review.
+      status: "pending",
       faqs,
       spec,
       price: minPrice(input.operations),
       payTo: input.payTo,
       upstreamUrl: input.upstreamUrl,
       upstreamSecretEnc: input.upstreamSecret ? encryptSecret(input.upstreamSecret) : null,
+      upstreamAuth: buildUpstreamAuth(input),
       publisherId: user.id,
     });
   } catch (error) {
@@ -126,6 +192,126 @@ export async function publishCapability(
   revalidatePath("/capabilities");
   revalidatePath("/marketplace");
   return { ok: true, slug };
+}
+
+/** Build the operations spec from the form's operation list (shared with publish). */
+function buildOperationsSpec(operations: PublishCapabilityInput["operations"]): CapabilitySpec {
+  const opSlugs = new Set<string>();
+  return {
+    operations: operations.map((op, i) => {
+      const base = slugify(op.name || `op-${i + 1}`) || `op-${i + 1}`;
+      let opSlug = base;
+      for (let n = 2; opSlugs.has(opSlug); n += 1) opSlug = `${base}-${n}`;
+      opSlugs.add(opSlug);
+      return {
+        name: op.name || "Request",
+        slug: opSlug,
+        path: op.path || undefined,
+        method: op.method || undefined,
+        sampleRequest: op.sampleRequest || undefined,
+        sampleResponse: op.sampleResponse || undefined,
+        price: op.price,
+      };
+    }),
+  };
+}
+
+/**
+ * Edit a capability the current user owns (or any capability, if the user is a
+ * Tael admin). Updates the editable fields and the operation list; the slug and
+ * the answered FAQ are preserved. The upstream secret is only re-encrypted when
+ * a new one is provided, so leaving the field blank keeps the existing key.
+ * Status is left as-is (a verified capability stays verified) — an admin can
+ * always revoke the badge if an edit changes what was reviewed.
+ */
+export async function editCapability(
+  id: string,
+  formData: FormData,
+): Promise<ActionResult & { slug?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  // Load the row and check the caller may edit it (owner or admin).
+  const [existing] = await db.select().from(capabilities).where(eq(capabilities.id, id)).limit(1);
+  if (!existing) return { ok: false, error: "Capability not found." };
+  const isOwner = existing.publisherId === user.id;
+  const isAdmin = ADMIN_WALLETS.has(user.walletAddress);
+  if (!isOwner && !isAdmin) return { ok: false, error: "Not authorized." };
+
+  const parsed = describeCapabilitySchema.safeParse(readDescribe(formData));
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+  const input = parsed.data;
+
+  try {
+    await db
+      .update(capabilities)
+      .set({
+        name: input.name,
+        description: input.description,
+        logoUrl: input.logoUrl || null,
+        contact: input.contact || null,
+        kind: input.kind,
+        visibility: input.visibility,
+        spec: buildOperationsSpec(input.operations),
+        price: minPrice(input.operations),
+        payTo: input.payTo,
+        upstreamUrl: input.upstreamUrl,
+        // Only overwrite the secret when a new one is entered; blank keeps it.
+        ...(input.upstreamSecret ? { upstreamSecretEnc: encryptSecret(input.upstreamSecret) } : {}),
+        upstreamAuth: buildUpstreamAuth(input),
+        updatedAt: new Date(),
+      })
+      .where(eq(capabilities.id, id));
+  } catch (error) {
+    console.error("[capabilities] edit failed:", error);
+    return { ok: false, error: "Could not save. Try again." };
+  }
+
+  revalidatePath("/capabilities");
+  revalidatePath("/marketplace");
+  revalidatePath(`/marketplace/${existing.slug}`);
+  return { ok: true, slug: existing.slug };
+}
+
+/** Tael-team wallet addresses allowed to grant/revoke the Verified badge. */
+const ADMIN_WALLETS = new Set(
+  (process.env.ADMIN_WALLET_ADDRESSES ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
+);
+
+/** Whether the signed-in user is a Tael admin (can grant Verified). */
+export async function isCurrentUserAdmin(): Promise<boolean> {
+  const user = await getCurrentUser();
+  return user ? ADMIN_WALLETS.has(user.walletAddress) : false;
+}
+
+/**
+ * Grant or revoke the Verified badge on a capability. Admin-only. Publishing
+ * leaves a capability `pending`; Tael marks it `verified` after review (or back
+ * to `pending`). Usability is unaffected either way — verified is a trust badge.
+ */
+export async function setCapabilityVerified(id: string, verified: boolean): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+  if (!ADMIN_WALLETS.has(user.walletAddress)) return { ok: false, error: "Not authorized." };
+
+  try {
+    await db
+      .update(capabilities)
+      .set({ status: verified ? "verified" : "pending" })
+      .where(eq(capabilities.id, id));
+  } catch (error) {
+    console.error("[capabilities] verify update failed:", error);
+    return { ok: false, error: "Could not update. Try again." };
+  }
+
+  revalidatePath("/marketplace");
+  revalidatePath("/marketplace/[slug]", "page");
+  return { ok: true };
 }
 
 /** Delete a capability the signed-in user owns. */
@@ -186,6 +372,9 @@ async function testUpstream(args: {
   method: string;
   body: string;
   secret: string;
+  authScheme: "bearer" | "header" | "none";
+  authHeader: string;
+  authExtraHeaders: string;
 }): Promise<TestResult> {
   if (isBlockedUrl(args.url)) {
     return {
@@ -199,8 +388,15 @@ async function testUpstream(args: {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15000);
   try {
+    // Mirror the gateway's auth injection so the test hits the endpoint the same
+    // way a live call will (Bearer, a named header like x-api-key, or none).
     const headers: Record<string, string> = { accept: "application/json" };
-    if (args.secret) headers.authorization = `Bearer ${args.secret}`;
+    if (args.secret) {
+      if (args.authScheme === "bearer") headers.authorization = `Bearer ${args.secret}`;
+      else if (args.authScheme === "header" && args.authHeader)
+        headers[args.authHeader] = args.secret;
+    }
+    for (const [k, v] of Object.entries(parseHeaderLines(args.authExtraHeaders))) headers[k] = v;
     let reqBody: string | undefined;
     if (args.method !== "GET" && args.method !== "DELETE" && args.body.trim()) {
       headers["content-type"] = "application/json";
@@ -242,9 +438,14 @@ function readDescribe(formData: FormData): Record<string, unknown> {
     name: formData.get("name"),
     kind: formData.get("kind"),
     description: formData.get("description") ?? "",
+    logoUrl: formData.get("logoUrl") ?? "",
+    contact: formData.get("contact") ?? "",
     payTo: formData.get("payTo"),
     upstreamUrl: formData.get("upstreamUrl"),
     upstreamSecret: formData.get("upstreamSecret") ?? "",
+    authScheme: formData.get("authScheme") ?? "bearer",
+    authHeader: formData.get("authHeader") ?? "",
+    authExtraHeaders: formData.get("authExtraHeaders") ?? "",
     visibility: formData.get("visibility") ?? "public",
     operations: safeParseJson(formData.get("operations")),
   };

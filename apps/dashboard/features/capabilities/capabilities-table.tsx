@@ -2,15 +2,16 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { BadgeCheck, Search, Trash2 } from "lucide-react";
+import { BadgeCheck, Pencil, Search, Trash2 } from "lucide-react";
 import { cn, Input } from "@tael/ui";
 import { formatPrice, kindMeta, timeAgo } from "./kind-meta";
+import { CapabilityLogo } from "./capability-logo";
 import { DeleteCapabilityDialog } from "./delete-capability-dialog";
 import type { CapabilityListItem } from "./list-item";
 
 export function CapabilitiesTable({ items }: { items: CapabilityListItem[] }) {
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<"all" | "verified" | "draft">("all");
+  const [status, setStatus] = useState<"all" | "verified" | "pending" | "draft">("all");
   const [pendingDelete, setPendingDelete] = useState<CapabilityListItem | null>(null);
 
   const filtered = useMemo(
@@ -44,6 +45,7 @@ export function CapabilitiesTable({ items }: { items: CapabilityListItem[] }) {
         >
           <option value="all">All statuses</option>
           <option value="verified">Verified</option>
+          <option value="pending">Pending</option>
           <option value="draft">Draft</option>
         </select>
       </div>
@@ -69,14 +71,12 @@ export function CapabilitiesTable({ items }: { items: CapabilityListItem[] }) {
                 <tr key={c.id} className="transition-colors hover:bg-muted/30">
                   <td className="px-4 py-3">
                     <Link href={`/marketplace/${c.slug}`} className="flex items-center gap-3">
-                      <span
-                        className={cn(
-                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
-                          meta.tile,
-                        )}
-                      >
-                        <Icon className="h-4 w-4" />
-                      </span>
+                      <CapabilityLogo
+                        src={c.logoUrl}
+                        name={c.name}
+                        kind={c.kind}
+                        className="h-9 w-9"
+                      />
                       <span className="min-w-0 font-medium">{c.name}</span>
                     </Link>
                   </td>
@@ -95,6 +95,10 @@ export function CapabilitiesTable({ items }: { items: CapabilityListItem[] }) {
                       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700">
                         <BadgeCheck className="h-3.5 w-3.5" /> Verified
                       </span>
+                    ) : c.status === "pending" ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Pending
+                      </span>
                     ) : (
                       <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                         Draft
@@ -112,14 +116,23 @@ export function CapabilitiesTable({ items }: { items: CapabilityListItem[] }) {
                     {timeAgo(c.createdAt)}
                   </td>
                   <td className="px-2 py-3 text-right">
-                    <button
-                      type="button"
-                      aria-label={`Delete ${c.name}`}
-                      onClick={() => setPendingDelete(c)}
-                      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Link
+                        href={`/capabilities/${c.id}/edit`}
+                        aria-label={`Edit ${c.name}`}
+                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Link>
+                      <button
+                        type="button"
+                        aria-label={`Delete ${c.name}`}
+                        onClick={() => setPendingDelete(c)}
+                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );

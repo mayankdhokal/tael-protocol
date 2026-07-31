@@ -10,6 +10,11 @@ const testEnv: Env = {
   STELLAR_NETWORK: "testnet",
   STELLAR_HORIZON_URL: "https://horizon-testnet.stellar.org",
   USDC_ISSUER: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+  TAEL_FEE_BPS: 100,
+  RATE_LIMIT_WINDOW_MS: 60000,
+  RATE_LIMIT_MAX: 120,
+  IDEMPOTENCY_TTL_MS: 600000,
+  PARTNER_HMAC_SECRET: undefined,
 };
 
 const app = createServer(createContainer(testEnv));

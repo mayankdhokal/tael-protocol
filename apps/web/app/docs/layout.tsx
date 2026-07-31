@@ -1,11 +1,22 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { DocsSidebar } from "./_components/docs-sidebar";
+import { GithubStar } from "./_components/github-star";
 import { ThemeToggle } from "./_components/theme-toggle";
 
 export const metadata: Metadata = {
-  title: "Docs — Tael",
-  description: "Documentation for Tael, the payment layer for autonomous AI agents.",
+  title: "Docs",
+  description:
+    "Documentation for Tael — wrap any API behind x402 payments and let AI agents pay per call in USDC on Stellar.",
+  alternates: { canonical: "/docs" },
+  openGraph: {
+    type: "website",
+    url: "https://taelprotocol.xyz/docs",
+    siteName: "Tael",
+    title: "Tael Docs",
+    description:
+      "Wrap any API behind x402 payments and let AI agents pay per call in USDC on Stellar.",
+  },
 };
 
 const TABS = [
@@ -44,6 +55,7 @@ export default function DocsLayout({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="ml-auto flex items-center gap-3">
+            <GithubStar />
             <ThemeToggle />
             <a
               href="/"

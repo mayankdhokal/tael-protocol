@@ -7,6 +7,11 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
+    "testnet:setup": "tsx src/scripts/testnet-setup.ts",
+    "testnet:mint": "tsx src/scripts/testnet-mint.ts",
+    "testnet:seed-market": "tsx src/scripts/testnet-seed-market.ts",
+    "pay:testnet": "tsx src/scripts/testnet-pay.ts",
+    "swap:testnet": "tsx src/scripts/testnet-swap.ts",
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -15,7 +20,9 @@
   "dependencies": {
     "@hono/node-server": "catalog:",
     "@stellar/stellar-sdk": "catalog:",
+    "@tael/database": "workspace:*",
     "@tael/payments": "workspace:*",
+    "@tael/sdk": "workspace:*",
     "@tael/stellar": "workspace:*",
     "@tael/types": "workspace:*",
     "@trpc/server": "catalog:",

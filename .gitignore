@@ -35,3 +35,10 @@ pnpm-debug.log*
 
 # Local-only project docs — kept on disk, not pushed
 /claude/
+
+# Local agent-skill artifacts (installed per-machine, not part of the repo)
+/.agents/
+/skills-lock.json
+
+# Generated capability registry (regenerated on every build)
+*.generated.ts

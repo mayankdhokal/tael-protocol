@@ -1,15 +1,37 @@
 import {
   createMockVerifier,
   type PaymentNetwork,
+  type PaymentPayload,
+  type PaymentRequirements,
   type PaymentVerifier,
   type SettlementReceipt,
+  type ValidatedPayment,
 } from "@tael/payments";
-import { createStellarSettlement, type StellarNetwork } from "@tael/stellar";
+import { PaymentVerificationError } from "@tael/types";
+import {
+  createStellarSettlement,
+  verifyTransactionPayments,
+  type ExpectedPayment,
+  type StellarNetwork,
+} from "@tael/stellar";
+import { getDatabase } from "@tael/database";
 import { type Env } from "./env";
 import { InMemoryWalletRepository } from "./modules/wallets/wallet.repository";
 import { WalletService } from "./modules/wallets/wallet.service";
-import { InMemoryPaymentRepository } from "./modules/payments/payment.repository";
+import {
+  DbPaymentRepository,
+  InMemoryPaymentRepository,
+} from "./modules/payments/payment.repository";
 import { PaymentService } from "./modules/payments/payment.service";
+import {
+  DbCapabilityRepository,
+  type CapabilityRepository,
+} from "./modules/capabilities/capability.repository";
+import { CapabilityWriteService } from "./modules/capabilities/capability-write";
+import { DbApiKeyRepository } from "./modules/keys/key.repository";
+import { KeyPaymentService } from "./modules/keys/key.service";
+import { type RateLimiter, InMemoryRateLimiter } from "./modules/gateway/rate-limit";
+import { type IdempotencyStore, InMemoryIdempotencyStore } from "./modules/gateway/idempotency";
 
 /**
  * The composition root. This is the ONE place where concrete implementations are
@@ -20,7 +42,24 @@ import { PaymentService } from "./modules/payments/payment.service";
 export interface Container {
   wallets: WalletService;
   payments: PaymentService;
+  capabilities: CapabilityRepository;
+  /** Write side of capabilities (publish/update/delete from the SDK/API). */
+  capabilityWrites: CapabilityWriteService;
+  /** Authenticates Tael API keys and auto-pays from their linked Card. */
+  keys: KeyPaymentService;
   verifier: PaymentVerifier;
+  limiter: RateLimiter;
+  idempotency: IdempotencyStore;
+  /** Payment settings the gateway needs to build x402 challenges. */
+  gateway: {
+    issuer: string;
+    network: PaymentNetwork;
+    publicUrl: string;
+    /** Marketplace fee recipient (Stellar address); undefined = no fee. */
+    feeAddress?: string;
+    /** Fee in basis points (100 = 1%). */
+    feeBps: number;
+  };
 }
 
 function toPaymentNetwork(network: StellarNetwork): PaymentNetwork {
@@ -36,21 +75,108 @@ function createStellarVerifier(env: Env): PaymentVerifier {
   });
   const network = toPaymentNetwork(env.STELLAR_NETWORK);
 
+  // Offline check that the signed tx actually pays the required legs (builder +
+  // any fee) in USDC, BEFORE submitting. Without this the gateway would settle
+  // and serve any well-formed transaction (submit-and-trust).
+  function assertPays(payload: PaymentPayload, requirements: PaymentRequirements): string {
+    const expected: ExpectedPayment[] = [
+      { to: requirements.payTo, minAmount: requirements.maxAmountRequired },
+    ];
+    if (requirements.fee) {
+      expected.push({ to: requirements.fee.payTo, minAmount: requirements.fee.amount });
+    }
+    const check = verifyTransactionPayments(
+      payload.payload.transaction,
+      env.STELLAR_NETWORK,
+      env.USDC_ISSUER,
+      expected,
+    );
+    if (!check.ok) {
+      throw new PaymentVerificationError(check.reason ?? "Payment does not satisfy requirements");
+    }
+    return check.payer ?? "";
+  }
+
   return {
-    async verify(payload): Promise<SettlementReceipt> {
+    validate(payload, requirements): Promise<ValidatedPayment> {
+      const payer = assertPays(payload, requirements);
+      return Promise.resolve({ payer, payload, requirements });
+    },
+    async settle(validated): Promise<SettlementReceipt> {
+      const receipt = await settlement.submitSignedTransaction(
+        validated.payload.payload.transaction,
+      );
+      return {
+        txHash: receipt.txHash,
+        network,
+        settledAt: new Date().toISOString(),
+        payer: validated.payer || receipt.payer,
+        amount: validated.requirements.maxAmountRequired,
+        asset: "USDC",
+      };
+    },
+    // Combined path (validate + settle) for callers that settle up front.
+    async verify(payload, requirements): Promise<SettlementReceipt> {
+      const payer = assertPays(payload, requirements);
       const receipt = await settlement.submitSignedTransaction(payload.payload.transaction);
-      return { txHash: receipt.txHash, network, settledAt: new Date().toISOString() };
+      return {
+        txHash: receipt.txHash,
+        network,
+        settledAt: new Date().toISOString(),
+        payer: payer || receipt.payer,
+        amount: requirements.maxAmountRequired,
+        asset: "USDC",
+      };
     },
   };
 }
 
 export function createContainer(env: Env): Container {
+  const isProd = env.NODE_ENV === "production";
+
   const wallets = new WalletService(new InMemoryWalletRepository());
-  const payments = new PaymentService(new InMemoryPaymentRepository());
+
+  // Persist to Postgres when a DATABASE_URL is configured (prod / real dev);
+  // fall back to the in-memory ledger so tests stay hermetic.
+  const db = process.env.DATABASE_URL ? getDatabase() : undefined;
+  const payments = new PaymentService(
+    db ? new DbPaymentRepository(db) : new InMemoryPaymentRepository(),
+  );
+  const capabilities = new DbCapabilityRepository(db);
+  const capabilityWrites = new CapabilityWriteService(db);
+
+  // API-key auth: resolve a key to its Card and sign payments from that Card's
+  // hot wallet, within the Card's caps. Needs the same Stellar settings the
+  // verifier uses. Without a DB, key auth simply never authenticates.
+  const keys = new KeyPaymentService(new DbApiKeyRepository(db), {
+    network: env.STELLAR_NETWORK,
+    x402Network: toPaymentNetwork(env.STELLAR_NETWORK),
+    horizonUrl: env.STELLAR_HORIZON_URL,
+    usdcIssuer: env.USDC_ISSUER,
+  });
 
   // Real on-chain settlement in production; a mock keeps dev + tests hermetic.
-  const verifier =
-    env.NODE_ENV === "production" ? createStellarVerifier(env) : createMockVerifier();
+  const verifier = isProd ? createStellarVerifier(env) : createMockVerifier();
 
-  return { wallets, payments, verifier };
+  const limiter = new InMemoryRateLimiter(env.RATE_LIMIT_WINDOW_MS, env.RATE_LIMIT_MAX);
+
+  const idempotency = new InMemoryIdempotencyStore(env.IDEMPOTENCY_TTL_MS);
+
+  return {
+    wallets,
+    payments,
+    capabilities,
+    capabilityWrites,
+    keys,
+    verifier,
+    limiter,
+    idempotency,
+    gateway: {
+      issuer: env.USDC_ISSUER,
+      network: toPaymentNetwork(env.STELLAR_NETWORK),
+      publicUrl: env.API_PUBLIC_URL,
+      feeAddress: env.TAEL_FEE_ADDRESS,
+      feeBps: env.TAEL_FEE_BPS,
+    },
+  };
 }

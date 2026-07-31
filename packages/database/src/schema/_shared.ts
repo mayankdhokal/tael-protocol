@@ -20,13 +20,24 @@ export const timestamps = {
 
 // --- Native enums (created as real Postgres types, not text) ---
 
-/** Kinds of purchasable capability. Mirrors @tael/types capabilityKind. */
+/**
+ * Kinds of purchasable capability. Mirrors @tael/types capabilityKind.
+ *
+ * "credit" is TrustLine's addition: unlike every other kind, its upstream is
+ * NOT a third-party service Tael proxies to — it's TrustLine's own read-only
+ * underwriting API (GET .../agent/:address/available-credit). It fits the
+ * existing per-call-price gateway model unmodified (a genuine, cheap, metered
+ * HTTP call), so no gateway changes were needed to add it — see
+ * TRUSTLINE_INTEGRATION.md for the full story (why this isn't a bigger,
+ * gateway-special-cased "financial capability" kind).
+ */
 export const capabilityKind = pgEnum("capability_kind", [
   "api",
   "mcp",
   "agent",
   "model",
   "dataset",
+  "credit",
 ]);
 
 /** Visibility of a published capability in the marketplace. */
@@ -37,11 +48,14 @@ export const capabilityVisibility = pgEnum("capability_visibility", [
 ]);
 
 /**
- * Verification lifecycle of a capability. `draft` = created but not through the
- * publish/verify wizard; `verified` = the publisher answered the AI-generated
- * FAQ and it's listed with a trust badge.
+ * Verification lifecycle of a capability.
+ *  - `draft`    — created but not published through the wizard (not listed).
+ *  - `pending`  — published and fully usable (listed + callable), but Tael has
+ *                 not vetted it yet, so it shows without the trust badge.
+ *  - `verified` — Tael-vetted; carries the green "Verified" badge.
+ * Only Tael grants `verified` (first-party listings + reviewed third parties).
  */
-export const capabilityStatus = pgEnum("capability_status", ["draft", "verified"]);
+export const capabilityStatus = pgEnum("capability_status", ["draft", "pending", "verified"]);
 
 /** Lifecycle of a payment / settlement. Mirrors @tael/types paymentStatus. */
 export const paymentStatus = pgEnum("payment_status", ["pending", "settled", "failed", "refunded"]);

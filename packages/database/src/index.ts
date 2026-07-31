@@ -18,6 +18,7 @@ export {
   desc,
   asc,
   sql,
+  ilike,
   inArray,
   isNull,
   isNotNull,
@@ -25,4 +26,5 @@ export {
   gte,
   lt,
   lte,
+  count,
 } from "drizzle-orm";
