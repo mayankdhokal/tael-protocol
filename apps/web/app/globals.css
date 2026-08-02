@@ -26,6 +26,20 @@ body {
   user-select: none;
 }
 
+.testimonial-post-text {
+  display: -webkit-box;
+  overflow: hidden;
+  white-space: pre-line;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 12;
+}
+
+@media (min-width: 768px) {
+  .testimonial-post-text {
+    -webkit-line-clamp: 6;
+  }
+}
+
 .marketing-pressable {
   transform: translateZ(0);
   transition-property: transform, background-color, border-color, color;

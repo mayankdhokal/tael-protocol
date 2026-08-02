@@ -7,6 +7,8 @@ const NAV_HREFS: Record<string, string> = {
   Community: "https://discord.gg/tcb6b7ZYha",
 };
 
+const DASHBOARD_URL = "https://mainnet.taelprotocol.xyz";
+
 const linkBase =
   "marketing-pressable marketing-nav-link flex h-9 items-center justify-center rounded-[100px] px-4 text-[14px] font-medium leading-5 tracking-normal whitespace-nowrap";
 
@@ -38,12 +40,14 @@ export function SiteHeader() {
           })}
         </nav>
 
-        <button
-          type="button"
+        <a
+          href={DASHBOARD_URL}
+          target="_blank"
+          rel="noopener noreferrer"
           className="marketing-pressable marketing-primary-button flex h-[38px] items-center justify-center rounded-[28px] bg-white px-5 text-[14px] font-medium leading-5 tracking-normal whitespace-nowrap text-black"
         >
           Connect Wallet
-        </button>
+        </a>
       </div>
     </header>
   );

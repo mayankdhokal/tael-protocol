@@ -167,9 +167,9 @@ export function MarketingFooter() {
   }
 
   return (
-    <footer className="relative overflow-hidden bg-[#141415] px-4 py-20 xl:min-h-[891px] xl:px-0 xl:pb-0 xl:pt-[168px]">
+    <footer className="relative overflow-hidden bg-[#141415] px-4 py-4 xl:min-h-[891px] xl:px-0 xl:pb-0 xl:pt-[168px]">
       <div className="mx-auto flex max-w-[640px] flex-col gap-10 overflow-hidden rounded-[24px] bg-[#1F1F20] p-6 xl:relative xl:h-[658px] xl:max-w-[1344px] xl:p-0">
-        <p className="font-display text-[96px] font-normal leading-none tracking-[0.2px] text-[#156DFC] xl:absolute xl:left-[72px] xl:top-[84px] xl:text-[164px] xl:leading-[164px]">
+        <p className="pl-7 font-display text-[96px] font-normal leading-none tracking-[0.2px] text-[#156DFC] xl:absolute xl:left-[72px] xl:top-[84px] xl:pl-0 xl:text-[164px] xl:leading-[164px]">
           t
         </p>
 
@@ -218,7 +218,7 @@ export function MarketingFooter() {
               <button
                 type="submit"
                 disabled={isShattering}
-                className="marketing-pressable marketing-primary-button h-12 shrink-0 rounded-full bg-white px-6 text-[16px] font-medium leading-6 text-[#141415] sm:h-[56px] sm:px-8 sm:text-[18px]"
+                className="marketing-pressable marketing-primary-button h-10 shrink-0 rounded-full bg-white px-[18px] text-[16px] font-medium leading-6 text-[#141415] sm:h-[56px] sm:px-8 sm:text-[18px]"
               >
                 Subscribe
               </button>
@@ -229,7 +229,7 @@ export function MarketingFooter() {
           </p>
         </div>
 
-        <div className="flex gap-4 xl:absolute xl:left-[72px] xl:top-[498px]">
+        <div className="order-last flex gap-4 xl:absolute xl:left-[72px] xl:top-[498px] xl:order-none">
           {SOCIAL_LINKS.map((social) => (
             <SocialLink key={social.label} label={social.label} href={social.href}>
               <social.icon />

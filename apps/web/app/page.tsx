@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import { DraggableCardScroll } from "./_components/draggable-card-scroll";
 import { MarketingFooter } from "./_components/marketing-footer";
+import { OpenAgentButton } from "./_components/open-agent-button";
 import { SiteHeader } from "./_components/site-header";
 import { TrustedCarousel } from "./_components/trusted-carousel";
 
@@ -16,84 +17,78 @@ const HERO_LOGOS = [
   { label: "Wave", className: "bg-[#43C8A7] text-[#06231D]" },
 ];
 
+const DASHBOARD_URL = "https://mainnet.taelprotocol.xyz";
+
 const FEATURES = [
   {
     title: "Own your funds",
     description:
       "Your keys, your funds. The agent acts inside your own wallet and never holds a cent of your money.",
     src: "/feature-own-funds.svg",
-    imageClass: "left-[-4px] top-[-25px] h-[345px] w-[624px] -scale-y-100",
+    imageClass:
+      "left-1/2 top-1/2 h-[345px] w-[624px] -translate-x-[34%] -translate-y-1/2 -scale-y-100 lg:left-[-4px] lg:top-[-25px] lg:translate-x-0 lg:translate-y-0",
   },
   {
     title: "Just ask, it acts",
     description:
       "No menus, no steps. Say what you want in plain English, and the agent does it for you.",
-    src: "/feature-just-ask.svg",
-    imageClass: "left-[-181px] top-[-17px] h-[448px] w-[810px] rotate-90",
+    src: "/feature-just-ask-extracted.png",
+    imageClass:
+      "left-1/2 top-1/2 h-[225px] w-auto -translate-x-1/2 -translate-y-1/2 sm:h-[260px]",
   },
   {
     title: "Access anywhere",
     description:
       "One setup, every channel. Your agent lives on your site, in Discord, in Telegram, and inside Claude and ChatGPT.",
-    src: "/feature-access.svg",
-    imageClass: "left-[-6px] top-[-25px] h-[345px] w-[624px]",
+    src: "/feature-access-extracted.png",
+    imageClass:
+      "left-1/2 top-1/2 h-[242px] w-auto -translate-x-1/2 -translate-y-1/2 sm:h-[286px]",
   },
   {
     title: "Safe by design",
     description:
       "You set the spending limits, and they're locked on-chain. Even a compromised agent can't go over them.",
-    src: "/feature-safe.svg",
-    imageClass: "left-[-181px] top-[-116px] h-[448px] w-[810px] rotate-90",
+    src: "/feature-safe-extracted.png",
+    imageClass:
+      "left-1/2 top-1/2 h-[214px] w-auto -translate-x-1/2 -translate-y-1/2 sm:h-[240px]",
   },
   {
     title: "Nothing hidden",
     description:
       "Every action is a real transaction on Stellar. You can check any of them, anytime.",
-    src: "/feature-hidden.svg",
-    imageClass: "left-[-181px] top-[-116px] h-[448px] w-[810px] rotate-180",
+    src: "/feature-hidden-extracted.png",
+    imageClass:
+      "left-1/2 top-1/2 h-[224px] w-auto -translate-x-1/2 -translate-y-1/2 sm:h-[260px]",
   },
   {
     title: "Low, flat fee",
     description: "A flat 0.07% on every transaction. No spreads, no surprises.",
-    src: "/feature-fee.svg",
-    imageClass: "left-[-181px] top-[-116px] h-[448px] w-[810px] rotate-180",
+    src: "/feature-fee-extracted.png",
+    imageClass:
+      "left-1/2 top-[52%] h-[238px] w-auto -translate-x-1/2 -translate-y-1/2 sm:h-[270px]",
   },
 ];
 
 const KYC_STEPS = [
   {
     title: "Connect",
-    description: (
-      <>
-        Sign up with your crypto wallet, passkey, Google,
-        <br className="hidden sm:block" />
-        Apple, or X. That simple.
-      </>
-    ),
+    description: "Sign in with your Stellar wallet or a passkey. No email, no KYC.",
     src: "/kyc-connect.svg",
-    imageClass: "left-[-139px] top-[-13px] h-[345px] w-[624px]",
+    imageClass:
+      "left-1/2 top-1/2 h-[345px] w-[624px] -translate-x-[51%] -translate-y-1/2 md:left-[-139px] md:top-[-13px] md:translate-x-0 md:translate-y-0",
   },
   {
     title: "Fund",
-    description: (
-      <>
-        Deposit crypto from any wallet or buy directly with a
-        <br className="hidden sm:block" />
-        card. No minimums.
-      </>
-    ),
+    description:
+      "Load USDC into your agent's wallet from any Stellar wallet. No minimums, fees are fractions of a cent.",
     src: "/kyc-fund.svg",
-    imageClass: "left-[-82px] top-[-25px] h-[345px] w-[624px]",
+    imageClass:
+      "left-1/2 top-1/2 h-[345px] w-[624px] -translate-x-[45%] -translate-y-1/2 md:left-[-82px] md:top-[-25px] md:translate-x-0 md:translate-y-0",
   },
   {
-    title: "Trade",
-    description: (
-      <>
-        Swap any token across 10 chains instantly. No
-        <br className="hidden sm:block" />
-        approvals, no delays.
-      </>
-    ),
+    title: "All set",
+    description:
+      "Tell your agent to pay, run a capability, or swap. It acts on-chain instantly. No code, no delays.",
     src: "/kyc-trade.svg",
     rotated: true,
   },
@@ -121,7 +116,7 @@ function StepArtwork({
 }) {
   if (rotated) {
     return (
-      <div className="absolute left-[-15px] top-[-38px] flex h-[736px] w-[407px] items-center justify-center">
+      <div className="absolute left-1/2 top-[106%] flex h-[736px] w-[407px] -translate-x-[49%] -translate-y-1/2 items-center justify-center md:left-[-15px] md:top-[-38px] md:translate-x-0 md:translate-y-0">
         <div className="flex-none rotate-90">
           <img src={src} alt="" aria-hidden="true" className="h-[407px] w-[736px] max-w-none" />
         </div>
@@ -134,7 +129,7 @@ function StepArtwork({
 
 function FeaturesSection() {
   return (
-    <section className="relative overflow-hidden bg-[#141415] pb-20 pt-24 md:min-h-[903px] md:pb-0 md:pt-[164px]">
+    <section className="relative -mt-px overflow-hidden bg-[#141415] pb-20 pt-24 md:min-h-[903px] md:pb-0 md:pt-[164px]">
       <div className="mx-auto flex max-w-[1440px] flex-col">
         <div className="flex flex-col items-center gap-4 px-6 text-center">
           <h2 className="max-w-[600px] text-[28px] font-medium leading-[36px] tracking-[-2.44px] text-white md:text-[48px] md:leading-[60px] md:tracking-[-0.0508em]">
@@ -143,18 +138,18 @@ function FeaturesSection() {
             freedom and experience.
           </h2>
           <p className="max-w-[650px] text-[14px] font-medium leading-5 tracking-normal text-[#B7B5BA]">
-            Your keys, Your funds. Trade over a million token with the experience of an exchange
+            Your keys, Your funds. Trade over a million token with the experience of an exchange{" "}
             <br className="hidden sm:block" />
             the freedom of wallet.
           </p>
         </div>
 
-        <DraggableCardScroll className="mt-12 w-full overflow-x-hidden overflow-y-hidden md:mt-[72px]">
-          <div className="flex w-max gap-6 pl-6 pr-6 md:pl-[120px] md:pr-[120px]">
+        <DraggableCardScroll className="mt-7 w-full overflow-visible md:mt-[72px] md:overflow-x-hidden md:overflow-y-hidden">
+          <div className="flex w-full flex-col gap-14 px-4 md:w-max md:flex-row md:gap-6 md:pl-[120px] md:pr-[120px]">
             {FEATURES.map((feature) => (
               <article
                 key={feature.title}
-                className="flex w-[calc(100vw-48px)] max-w-[400px] shrink-0 flex-col gap-[23px]"
+                className="flex w-full shrink-0 flex-col gap-[23px] md:w-[400px]"
               >
                 <div className="relative h-[276px] w-full overflow-hidden rounded-[24px] bg-[#1F1F20] sm:h-[320px]">
                   <img
@@ -183,15 +178,18 @@ function FeaturesSection() {
 
 function KycSection() {
   return (
-    <section className="relative overflow-hidden bg-[#141415] pb-20 pt-20 md:pb-0 md:pt-[79px]">
-      <div className="mx-auto flex max-w-[1440px] flex-col items-center px-6">
+    <section
+      id="kyc"
+      className="relative -mt-px overflow-hidden bg-[#141415] pb-20 pt-20 md:pb-0 md:pt-[79px]"
+    >
+      <div className="mx-auto flex max-w-[1440px] flex-col items-center px-4 md:px-6">
         <h2 className="text-center text-[36px] font-medium leading-[42px] tracking-[-0.035em] text-white md:text-[48px] md:leading-[60px] md:tracking-[-0.0508em]">
           Jump right in,
           <br />
           no KYC required.
         </h2>
 
-        <div className="mt-12 grid w-full max-w-[1200px] grid-cols-1 gap-10 md:mt-[72px] md:grid-cols-3 md:gap-6">
+        <div className="mt-12 grid w-full max-w-[1200px] grid-cols-1 gap-14 md:mt-[72px] md:grid-cols-3 md:gap-6">
           {KYC_STEPS.map((step) => (
             <article key={step.title} className="flex w-full flex-col gap-6 md:w-[384px]">
               <div className="relative h-[276px] w-full overflow-hidden rounded-[24px] bg-[#1F1F20] sm:h-[320px] md:w-[384px]">
@@ -215,7 +213,7 @@ function KycSection() {
 
 function TrustedSection() {
   return (
-    <section className="relative overflow-hidden bg-[#141415] pb-20 pt-24 md:min-h-[891px] md:pb-0 md:pt-[184px]">
+    <section className="relative -mt-px overflow-hidden bg-[#141415] pb-20 pt-24 md:min-h-[891px] md:pb-0 md:pt-[184px]">
       <TrustedCarousel />
     </section>
   );
@@ -247,25 +245,24 @@ export default function HomePage() {
                 Stellar ecosystem for AI Agents
               </h1>
               <p className="max-w-[760px] text-[16px] font-medium leading-7 tracking-normal text-[#B7B5BA] sm:text-[20px] sm:leading-8">
-                Boba Agents is an AI crypto trading interface and agent. Say what you want to
-                trade. Create automated trading workflows and watch it execute.
+                The on-chain action layer for AI agents on Stellar. Say what you want, your agent
+                does it, non-custodial and Soroban secured.
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-4">
-              <a
-                href="https://discord.gg/tcb6b7ZYha"
-                target="_blank"
-                rel="noopener noreferrer"
+              <OpenAgentButton
                 className="marketing-pressable marketing-muted-button flex h-12 w-[157px] items-center justify-center rounded-[28px] border border-[#565458] bg-[#3C3A3F] px-5 py-[13px] text-[15px] font-medium leading-5 tracking-normal whitespace-nowrap text-white"
               >
                 Talk to an agent
-              </a>
-              <button
-                type="button"
+              </OpenAgentButton>
+              <a
+                href={DASHBOARD_URL}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="marketing-pressable marketing-primary-button flex h-12 w-[148px] items-center justify-center rounded-[28px] bg-white px-5 text-[15px] font-medium leading-5 tracking-normal whitespace-nowrap text-black"
               >
                 Connect Wallet
-              </button>
+              </a>
             </div>
           </div>
         </div>
