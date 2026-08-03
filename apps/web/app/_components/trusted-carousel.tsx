@@ -106,8 +106,12 @@ export function TrustedCarousel() {
     if (!row) return;
 
     const firstCard = row.querySelector<HTMLElement>("[data-testimonial-card]");
-    const gap = Number.parseFloat(window.getComputedStyle(row.firstElementChild as Element).columnGap);
-    const cardStep = firstCard ? firstCard.getBoundingClientRect().width + (Number.isNaN(gap) ? 32 : gap) : 458;
+    const gap = Number.parseFloat(
+      window.getComputedStyle(row.firstElementChild as Element).columnGap,
+    );
+    const cardStep = firstCard
+      ? firstCard.getBoundingClientRect().width + (Number.isNaN(gap) ? 32 : gap)
+      : 458;
 
     setActiveSide(null);
     row.scrollBy({ left: cardStep * direction, behavior: "smooth" });
@@ -147,7 +151,9 @@ export function TrustedCarousel() {
           >
             <img
               src={
-                leftHighlighted ? "/testimonial-arrow-active.svg" : "/testimonial-arrow-inactive.svg"
+                leftHighlighted
+                  ? "/testimonial-arrow-active.svg"
+                  : "/testimonial-arrow-inactive.svg"
               }
               alt=""
               aria-hidden="true"
@@ -166,7 +172,9 @@ export function TrustedCarousel() {
           >
             <img
               src={
-                rightHighlighted ? "/testimonial-arrow-active.svg" : "/testimonial-arrow-inactive.svg"
+                rightHighlighted
+                  ? "/testimonial-arrow-active.svg"
+                  : "/testimonial-arrow-inactive.svg"
               }
               alt=""
               aria-hidden="true"

@@ -360,7 +360,9 @@ export function TaelAgent({
               )}
               {showStoredIntro && (
                 <>
-                  <MessageBubble message={{ id: "stored-intro", role: "assistant", content: intro }} />
+                  <MessageBubble
+                    message={{ id: "stored-intro", role: "assistant", content: intro }}
+                  />
                   <MessageBubble
                     message={{
                       id: "stored-demo-prompt",

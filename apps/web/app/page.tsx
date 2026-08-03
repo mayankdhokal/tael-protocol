@@ -33,32 +33,28 @@ const FEATURES = [
     description:
       "No menus, no steps. Say what you want in plain English, and the agent does it for you.",
     src: "/feature-just-ask-extracted.png",
-    imageClass:
-      "left-1/2 top-1/2 h-[225px] w-auto -translate-x-1/2 -translate-y-1/2 sm:h-[260px]",
+    imageClass: "left-1/2 top-1/2 h-[225px] w-auto -translate-x-1/2 -translate-y-1/2 sm:h-[260px]",
   },
   {
     title: "Access anywhere",
     description:
       "One setup, every channel. Your agent lives on your site, in Discord, in Telegram, and inside Claude and ChatGPT.",
     src: "/feature-access-extracted.png",
-    imageClass:
-      "left-1/2 top-1/2 h-[242px] w-auto -translate-x-1/2 -translate-y-1/2 sm:h-[286px]",
+    imageClass: "left-1/2 top-1/2 h-[242px] w-auto -translate-x-1/2 -translate-y-1/2 sm:h-[286px]",
   },
   {
     title: "Safe by design",
     description:
       "You set the spending limits, and they're locked on-chain. Even a compromised agent can't go over them.",
     src: "/feature-safe-extracted.png",
-    imageClass:
-      "left-1/2 top-1/2 h-[214px] w-auto -translate-x-1/2 -translate-y-1/2 sm:h-[240px]",
+    imageClass: "left-1/2 top-1/2 h-[214px] w-auto -translate-x-1/2 -translate-y-1/2 sm:h-[240px]",
   },
   {
     title: "Nothing hidden",
     description:
       "Every action is a real transaction on Stellar. You can check any of them, anytime.",
     src: "/feature-hidden-extracted.png",
-    imageClass:
-      "left-1/2 top-1/2 h-[224px] w-auto -translate-x-1/2 -translate-y-1/2 sm:h-[260px]",
+    imageClass: "left-1/2 top-1/2 h-[224px] w-auto -translate-x-1/2 -translate-y-1/2 sm:h-[260px]",
   },
   {
     title: "Low, flat fee",
@@ -124,7 +120,9 @@ function StepArtwork({
     );
   }
 
-  return <img src={src} alt="" aria-hidden="true" className={`absolute max-w-none ${imageClass}`} />;
+  return (
+    <img src={src} alt="" aria-hidden="true" className={`absolute max-w-none ${imageClass}`} />
+  );
 }
 
 function FeaturesSection() {
@@ -250,9 +248,7 @@ export default function HomePage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-4">
-              <OpenAgentButton
-                className="marketing-pressable marketing-muted-button flex h-12 w-[157px] items-center justify-center rounded-[28px] border border-[#565458] bg-[#3C3A3F] px-5 py-[13px] text-[15px] font-medium leading-5 tracking-normal whitespace-nowrap text-white"
-              >
+              <OpenAgentButton className="marketing-pressable marketing-muted-button flex h-12 w-[157px] items-center justify-center rounded-[28px] border border-[#565458] bg-[#3C3A3F] px-5 py-[13px] text-[15px] font-medium leading-5 tracking-normal whitespace-nowrap text-white">
                 Talk to an agent
               </OpenAgentButton>
               <a
